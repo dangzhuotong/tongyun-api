@@ -17,7 +17,12 @@ import {
   FileUp,
   Shield,
   Radio,
-  ChevronDown
+  ChevronDown,
+  FlaskConical,
+  CheckCircle2,
+  XCircle,
+  RotateCcw,
+  Download
 } from 'lucide-react';
 import {
   RequestData,
@@ -29,10 +34,17 @@ import {
   AssertionType,
   ResponsePayload,
   FormDataItem,
-  RedirectPolicy
+  RedirectPolicy,
+  TestCaseItem
 } from '../types/api';
 import { exportToCurl } from '../utils/curl';
-import { generateSmartAssertions } from '../utils/tester';
+import {
+  generateSmartAssertions,
+  generateAiTestCaseSuite,
+  exportTestCasesToHttp,
+  evaluateAssertions
+} from '../utils/tester';
+import { apiClient } from '../services/apiClient';
 import { getMethodBadgeColor } from './Sidebar';
 import { WebSocketPanel } from './WebSocketPanel';
 
@@ -57,11 +69,19 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
   lastResponse,
   onToast,
 }) => {
-  const [activeTab, setActiveTab] = useState<'params' | 'headers' | 'auth' | 'body' | 'tests' | 'docs' | 'settings'>('params');
+  const [activeTab, setActiveTab] = useState<'params' | 'headers' | 'auth' | 'body' | 'cases' | 'tests' | 'docs' | 'settings'>('params');
   const [copiedCurl, setCopiedCurl] = useState(false);
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [aiPromptInput, setAiPromptInput] = useState('');
   const [isTemplateMenuOpen, setIsTemplateMenuOpen] = useState(false);
+
+  // 测试用例集状态
+  const [runningCaseId, setRunningCaseId] = useState<string | null>(null);
+  const [isRunningAllCases, setIsRunningAllCases] = useState(false);
+  const [newCaseNameInput, setNewCaseNameInput] = useState('');
+  const [newCaseCategory, setNewCaseCategory] = useState<'positive' | 'negative' | 'boundary' | 'security'>('positive');
+  const [showSaveCaseModal, setShowSaveCaseModal] = useState(false);
+  const [copiedHttpCases, setCopiedHttpCases] = useState(false);
 
   // 常见接口一键模板
   const AI_TEMPLATES = [
@@ -391,8 +411,169 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
     updateField('body', { ...request.body, form_data: current });
   };
 
+  // 用例集管理与 AI 生成
+  const handleGenerateAiCases = () => {
+    const suite = generateAiTestCaseSuite(request);
+    const existing = request.cases || [];
+    updateField('cases', [...existing, ...suite]);
+    if (onToast) onToast(`🪄 AI 已根据接口参数生成 ${suite.length} 个覆盖用例 (正向/异常/边界/安全)`);
+  };
+
+  const handleSaveCurrentAsCase = () => {
+    const name = newCaseNameInput.trim() || `用例 ${(request.cases?.length || 0) + 1}`;
+    const newCase: TestCaseItem = {
+      id: `case_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name,
+      category: newCaseCategory,
+      description: '手动固化的请求快照',
+      params: JSON.parse(JSON.stringify(request.params)),
+      headers: JSON.parse(JSON.stringify(request.headers)),
+      body: JSON.parse(JSON.stringify(request.body)),
+      auth: JSON.parse(JSON.stringify(request.auth)),
+      tests: JSON.parse(JSON.stringify(request.tests || [])),
+    };
+    updateField('cases', [...(request.cases || []), newCase]);
+    setNewCaseNameInput('');
+    setShowSaveCaseModal(false);
+    if (onToast) onToast(`💾 已将当前请求状态保存为测试用例: "${name}"`);
+  };
+
+  const handleApplyCase = (c: TestCaseItem) => {
+    onChange({
+      ...request,
+      params: JSON.parse(JSON.stringify(c.params)),
+      headers: JSON.parse(JSON.stringify(c.headers)),
+      body: JSON.parse(JSON.stringify(c.body)),
+      auth: JSON.parse(JSON.stringify(c.auth)),
+      tests: JSON.parse(JSON.stringify(c.tests)),
+      activeCaseId: c.id,
+    });
+    if (onToast) onToast(`🔄 已载入测试用例: "${c.name}" 到编辑器`);
+  };
+
+  const handleDeleteCase = (caseId: string) => {
+    const updated = (request.cases || []).filter(c => c.id !== caseId);
+    updateField('cases', updated);
+  };
+
+  const handleRunSingleCase = async (c: TestCaseItem) => {
+    setRunningCaseId(c.id);
+    try {
+      const reqToRun: RequestData = {
+        ...request,
+        params: c.params,
+        headers: c.headers,
+        body: c.body,
+        auth: c.auth,
+        tests: c.tests,
+      };
+      const resp = await apiClient.executeHttpRequest(reqToRun, environment);
+      const assertionResults = evaluateAssertions(c.tests, resp);
+      const allPassed = assertionResults.length === 0 ? (resp.status >= 200 && resp.status < 300) : assertionResults.every(a => a.passed);
+
+      const updatedCases = (request.cases || []).map(item => {
+        if (item.id === c.id) {
+          return {
+            ...item,
+            lastResult: {
+              passed: allPassed,
+              status: resp.status,
+              timeMs: resp.time_ms,
+              timestamp: Date.now(),
+              assertionResults,
+              error: resp.status >= 400 ? resp.status_text : undefined,
+            },
+          };
+        }
+        return item;
+      });
+      updateField('cases', updatedCases);
+      if (onToast) {
+        onToast(allPassed ? `✅ 用例「${c.name}」测试通过 (${resp.status}, ${resp.time_ms}ms)` : `❌ 用例「${c.name}」断言未通过`);
+      }
+    } catch (err: any) {
+      if (onToast) onToast(`❌ 用例「${c.name}」执行异常: ${err.message || '未知错误'}`);
+    } finally {
+      setRunningCaseId(null);
+    }
+  };
+
+  const handleRunAllCases = async () => {
+    const cases = request.cases || [];
+    if (cases.length === 0) return;
+    setIsRunningAllCases(true);
+    let passCount = 0;
+    let failCount = 0;
+    const newCases = [...cases];
+
+    for (let i = 0; i < newCases.length; i++) {
+      const c = newCases[i];
+      setRunningCaseId(c.id);
+      try {
+        const reqToRun: RequestData = {
+          ...request,
+          params: c.params,
+          headers: c.headers,
+          body: c.body,
+          auth: c.auth,
+          tests: c.tests,
+        };
+        const resp = await apiClient.executeHttpRequest(reqToRun, environment);
+        const assertionResults = evaluateAssertions(c.tests, resp);
+        const allPassed = assertionResults.length === 0 ? (resp.status >= 200 && resp.status < 300) : assertionResults.every(a => a.passed);
+        if (allPassed) passCount++;
+        else failCount++;
+
+        newCases[i] = {
+          ...c,
+          lastResult: {
+            passed: allPassed,
+            status: resp.status,
+            timeMs: resp.time_ms,
+            timestamp: Date.now(),
+            assertionResults,
+            error: resp.status >= 400 ? resp.status_text : undefined,
+          },
+        };
+      } catch (err: any) {
+        failCount++;
+        newCases[i] = {
+          ...c,
+          lastResult: {
+            passed: false,
+            status: 0,
+            timeMs: 0,
+            timestamp: Date.now(),
+            assertionResults: [],
+            error: err.message || '执行异常',
+          },
+        };
+      }
+    }
+    updateField('cases', newCases);
+    setRunningCaseId(null);
+    setIsRunningAllCases(false);
+    if (onToast) {
+      onToast(`🏁 测试用例全部执行完成: ${passCount} 通过 / ${failCount} 失败`);
+    }
+  };
+
+  const handleExportCasesHttp = () => {
+    const cases = request.cases || [];
+    if (cases.length === 0) {
+      if (onToast) onToast('⚠️ 当前无测试用例可导出');
+      return;
+    }
+    const text = exportTestCasesToHttp(request, cases);
+    navigator.clipboard.writeText(text);
+    setCopiedHttpCases(true);
+    setTimeout(() => setCopiedHttpCases(false), 2000);
+    if (onToast) onToast('📋 已将测试用例矩阵复制为 IntelliJ IDEA .http 多请求语法！');
+  };
+
   const activeParamsCount = request.params.filter(p => p.enabled && p.key.trim()).length;
   const activeHeadersCount = request.headers.filter(h => h.enabled && h.key.trim()).length;
+  const activeCasesCount = request.cases?.length || 0;
   const activeTestsCount = (request.tests?.filter(t => t.enabled).length || 0) + (request.extracts?.filter(e => e.enabled).length || 0);
 
   return (
@@ -592,6 +773,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
               { id: 'headers', label: 'Headers', count: activeHeadersCount },
               { id: 'auth', label: 'Auth', badge: request.auth.auth_type !== 'none' ? request.auth.auth_type.toUpperCase() : undefined },
               { id: 'body', label: 'Body', badge: request.body.body_type !== 'none' ? request.body.body_type.toUpperCase() : undefined },
+              { id: 'cases', label: '用例集', count: activeCasesCount },
               { id: 'tests', label: '断言与测试', count: activeTestsCount },
               { id: 'docs', label: '文档' },
               { id: 'settings', label: '设置', badge: request.redirect_policy && request.redirect_policy !== 'safe' ? request.redirect_policy : undefined },
@@ -1147,6 +1329,348 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
                   }
                   className="w-full flex-1 bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] rounded-[var(--ty-radius-sm)] p-3 text-xs font-mono text-[var(--ty-text)] placeholder-[var(--ty-text-subtle)] focus:outline-none focus:border-[var(--ty-matcha)] transition-colors resize-none leading-relaxed"
                 />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* CASES TAB */}
+        {activeTab === 'cases' && (
+          <div className="space-y-4 max-w-4xl text-xs">
+            {/* Header & Global Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--ty-border)] pb-3">
+              <div>
+                <h4 className="font-semibold text-sm text-[var(--ty-text)] flex items-center gap-1.5">
+                  <FlaskConical className="w-4 h-4 text-[var(--ty-matcha)]" />
+                  <span>测试用例矩阵 (Test Cases)</span>
+                </h4>
+                <p className="text-[11px] text-[var(--ty-text-subtle)] mt-0.5">
+                  为当前接口维护多组入参、请求体与预期断言。支持 AI 自动推导覆盖用例、单步调试、批量运行，并可无缝导出为标准 IntelliJ IDEA <code className="font-mono text-[var(--ty-text)]">.http</code> 多用例语法。
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleGenerateAiCases}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-matcha)] hover:bg-[var(--ty-matcha-hover)] text-[#10140f] font-bold text-xs shadow-xs transition-colors"
+                  title="根据当前请求的 URL、参数与 Body 自动推导正向、异常、边界、安全测试用例"
+                >
+                  <Sparkles className="w-3.5 h-3.5 fill-current" />
+                  <span>🪄 AI 生成用例</span>
+                </button>
+
+                <button
+                  onClick={() => setShowSaveCaseModal(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-[var(--ty-text)] text-xs transition-colors"
+                  title="将当前编辑器中的参数与断言固化为一个新用例"
+                >
+                  <Plus className="w-3.5 h-3.5 text-[var(--ty-matcha)]" />
+                  <span>保存当前为用例</span>
+                </button>
+
+                <button
+                  onClick={handleRunAllCases}
+                  disabled={isRunningAllCases || !request.cases || request.cases.length === 0}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-[var(--ty-text)] text-xs disabled:opacity-40 transition-colors"
+                  title="依次执行所有用例并校验断言"
+                >
+                  {isRunningAllCases ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-[var(--ty-matcha)]" />
+                  ) : (
+                    <Play className="w-3.5 h-3.5 fill-current text-[var(--ty-matcha)]" />
+                  )}
+                  <span>{isRunningAllCases ? '批量执行中...' : '全部执行'}</span>
+                </button>
+
+                <button
+                  onClick={handleExportCasesHttp}
+                  disabled={!request.cases || request.cases.length === 0}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-[var(--ty-text)] text-xs disabled:opacity-40 transition-colors"
+                  title="导出为 IntelliJ IDEA .http 纯文本格式并复制到剪贴板"
+                >
+                  {copiedHttpCases ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-[var(--ty-matcha)]" />
+                      <span className="text-[var(--ty-matcha)]">已复制</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-3.5 h-3.5" />
+                      <span>导出 .http</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Modal: Save Current as Case */}
+            {showSaveCaseModal && (
+              <div className="p-3.5 rounded-[var(--ty-radius-sm)] border border-[var(--ty-matcha)]/40 bg-[var(--ty-surface-raised)] shadow-[var(--ty-shadow-pop)] space-y-3">
+                <div className="flex items-center justify-between text-xs font-semibold text-[var(--ty-text)]">
+                  <span className="flex items-center gap-1.5">
+                    <FlaskConical className="w-4 h-4 text-[var(--ty-matcha)]" />
+                    <span>将当前请求状态保存为测试用例快照</span>
+                  </span>
+                  <button onClick={() => setShowSaveCaseModal(false)} className="text-[var(--ty-text-subtle)] hover:text-[var(--ty-text)]">✕</button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-xs">
+                  <div className="md:col-span-2">
+                    <label className="text-[11px] text-[var(--ty-text-subtle)] mb-1 block">用例名称</label>
+                    <input
+                      type="text"
+                      value={newCaseNameInput}
+                      onChange={e => setNewCaseNameInput(e.target.value)}
+                      placeholder={`例如: 正向流程 - 携带合法参数`}
+                      className="w-full bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] rounded-[var(--ty-radius-xs,4px)] px-2.5 py-1.5 text-xs text-[var(--ty-text)] focus:outline-none focus:border-[var(--ty-matcha)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-[var(--ty-text-subtle)] mb-1 block">用例类型</label>
+                    <select
+                      value={newCaseCategory}
+                      onChange={e => setNewCaseCategory(e.target.value as any)}
+                      className="w-full bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] rounded-[var(--ty-radius-xs,4px)] px-2.5 py-1.5 text-xs text-[var(--ty-text)] focus:outline-none focus:border-[var(--ty-matcha)]"
+                    >
+                      <option value="positive">正向测试 (Happy Path)</option>
+                      <option value="negative">异常入参 (Negative)</option>
+                      <option value="boundary">边界极值 (Boundary)</option>
+                      <option value="security">安全权限 (Security)</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    onClick={() => setShowSaveCaseModal(false)}
+                    className="px-3 py-1 rounded-[var(--ty-radius-xs,4px)] text-xs text-[var(--ty-text-muted)] hover:bg-[var(--ty-surface)] transition-colors"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={handleSaveCurrentAsCase}
+                    className="px-3 py-1 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-matcha)] hover:bg-[var(--ty-matcha-hover)] text-[#10140f] font-semibold text-xs transition-colors"
+                  >
+                    确认保存
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Empty State */}
+            {(!request.cases || request.cases.length === 0) ? (
+              <div className="p-8 border border-dashed border-[var(--ty-border)] rounded-[var(--ty-radius-md)] text-center bg-[var(--ty-surface-sunken)] space-y-3">
+                <div className="w-10 h-10 rounded-full bg-[var(--ty-surface-raised)] border border-[var(--ty-border)] flex items-center justify-center mx-auto text-[var(--ty-matcha)]">
+                  <FlaskConical className="w-5 h-5" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-xs font-semibold text-[var(--ty-text)]">当前接口暂无测试用例</h4>
+                  <p className="text-[11px] text-[var(--ty-text-subtle)] max-w-md mx-auto leading-relaxed">
+                    使用用例集可固化不同的请求体、查询参数与预期断言。点击下方按钮即可让 AI 自动推导标准测试矩阵。
+                  </p>
+                </div>
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <button
+                    onClick={handleGenerateAiCases}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--ty-radius-sm)] bg-[var(--ty-matcha)] hover:bg-[var(--ty-matcha-hover)] text-[#10140f] font-bold text-xs shadow-xs transition-colors"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 fill-current" />
+                    <span>🪄 AI 一键生成用例矩阵</span>
+                  </button>
+                  <button
+                    onClick={() => setShowSaveCaseModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--ty-radius-sm)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-[var(--ty-text)] text-xs transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-[var(--ty-matcha)]" />
+                    <span>保存当前参数为用例</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* Stats Bar */}
+                <div className="flex items-center justify-between text-xs px-1 text-[var(--ty-text-subtle)]">
+                  <div className="flex items-center gap-3">
+                    <span>共 <b className="text-[var(--ty-text)] font-mono">{request.cases.length}</b> 个测试用例</span>
+                    {request.cases.filter(c => c.lastResult?.passed).length > 0 && (
+                      <span className="text-[var(--ty-matcha)] font-mono flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        {request.cases.filter(c => c.lastResult?.passed).length} 通过
+                      </span>
+                    )}
+                    {request.cases.filter(c => c.lastResult && !c.lastResult.passed).length > 0 && (
+                      <span className="text-[var(--ty-peach)] font-mono flex items-center gap-1">
+                        <XCircle className="w-3.5 h-3.5" />
+                        {request.cases.filter(c => c.lastResult && !c.lastResult.passed).length} 失败
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[11px] font-mono text-[var(--ty-text-subtle)]">
+                    点击「载入」可恢复该用例到编辑器调试
+                  </div>
+                </div>
+
+                {/* Case Cards List */}
+                {request.cases.map((c, idx) => {
+                  const isRunning = runningCaseId === c.id;
+                  const isActive = request.activeCaseId === c.id;
+                  const categoryStyles = {
+                    positive: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+                    negative: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+                    boundary: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+                    security: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+                  }[c.category] || 'bg-[var(--ty-surface-raised)] text-[var(--ty-text)] border-[var(--ty-border)]';
+
+                  const categoryLabels = {
+                    positive: '正向用例',
+                    negative: '异常入参',
+                    boundary: '边界极值',
+                    security: '安全鉴权',
+                  }[c.category] || '测试用例';
+
+                  return (
+                    <div
+                      key={c.id || idx}
+                      className={`p-3.5 rounded-[var(--ty-radius-sm)] border transition-all ${
+                        isActive
+                          ? 'border-[var(--ty-matcha)] bg-[var(--ty-surface-raised)] ring-1 ring-[var(--ty-matcha)]/30'
+                          : 'border-[var(--ty-border)] bg-[var(--ty-surface-sunken)] hover:border-[var(--ty-border-subtle)]'
+                      }`}
+                    >
+                      {/* Card Top: Header & Actions */}
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`px-2 py-0.5 rounded-[var(--ty-radius-xs,4px)] text-[10px] font-mono border ${categoryStyles} shrink-0`}>
+                            {categoryLabels}
+                          </span>
+                          <span className="font-semibold text-xs text-[var(--ty-text)] truncate">
+                            {c.name}
+                          </span>
+                          {isActive && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] bg-[var(--ty-matcha)]/15 text-[var(--ty-matcha)] font-mono shrink-0">
+                              当前编辑中
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {/* Execution Result Badge */}
+                          {c.lastResult && (
+                            <div className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono border bg-[var(--ty-surface)] border-[var(--ty-border)] mr-1">
+                              {c.lastResult.passed ? (
+                                <>
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-[var(--ty-matcha)]" />
+                                  <span className="text-[var(--ty-matcha)]">{c.lastResult.status} OK</span>
+                                  <span className="text-[var(--ty-text-subtle)]">({c.lastResult.timeMs}ms)</span>
+                                </>
+                              ) : (
+                                <>
+                                  <XCircle className="w-3.5 h-3.5 text-[var(--ty-peach)]" />
+                                  <span className="text-[var(--ty-peach)]">{c.lastResult.status || 'Fail'}</span>
+                                  <span className="text-[var(--ty-text-subtle)]">({c.lastResult.timeMs}ms)</span>
+                                </>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Run Button */}
+                          <button
+                            onClick={() => handleRunSingleCase(c)}
+                            disabled={isRunning || isRunningAllCases}
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-matcha)]/15 hover:bg-[var(--ty-matcha)]/25 text-[var(--ty-matcha)] font-medium text-xs transition-colors disabled:opacity-50"
+                            title="单独执行此用例并验证断言"
+                          >
+                            {isRunning ? (
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Play className="w-3 h-3 fill-current" />
+                            )}
+                            <span>{isRunning ? '执行中' : '运行'}</span>
+                          </button>
+
+                          {/* Apply to Editor Button */}
+                          <button
+                            onClick={() => handleApplyCase(c)}
+                            className="flex items-center gap-1 px-2 py-1 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface)] border border-[var(--ty-border)] text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] text-xs transition-colors"
+                            title="将此用例的参数载入到上方编辑器进行单步调试"
+                          >
+                            <RotateCcw className="w-3 h-3 text-[var(--ty-sky)]" />
+                            <span>载入</span>
+                          </button>
+
+                          {/* Delete Button */}
+                          <button
+                            onClick={() => handleDeleteCase(c.id)}
+                            className="p-1 rounded text-[var(--ty-text-subtle)] hover:text-[var(--ty-peach)] transition-colors"
+                            title="删除此用例"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Description */}
+                      {c.description && (
+                        <p className="text-[11px] text-[var(--ty-text-subtle)] mb-2.5 leading-relaxed">
+                          {c.description}
+                        </p>
+                      )}
+
+                      {/* Case Data Preview Badges */}
+                      <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono text-[var(--ty-text-subtle)] pt-1 border-t border-[var(--ty-border)]/50">
+                        <span className="px-1.5 py-0.5 rounded bg-[var(--ty-surface)] border border-[var(--ty-border)]/60">
+                          Params: <b className="text-[var(--ty-text)]">{c.params.filter(p => p.enabled).length}</b>
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded bg-[var(--ty-surface)] border border-[var(--ty-border)]/60">
+                          Body: <b className="text-[var(--ty-text)]">{c.body.body_type}</b>
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded bg-[var(--ty-surface)] border border-[var(--ty-border)]/60">
+                          Auth: <b className="text-[var(--ty-text)]">{c.auth.auth_type}</b>
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded bg-[var(--ty-surface)] border border-[var(--ty-border)]/60">
+                          断言: <b className="text-[var(--ty-matcha)]">{c.tests.length}</b> 条
+                        </span>
+
+                        {/* Assertions chips preview */}
+                        <div className="flex flex-wrap items-center gap-1 ml-auto">
+                          {c.tests.slice(0, 3).map((t, tidx) => (
+                            <span key={tidx} className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--ty-surface-raised)] border border-[var(--ty-border)] text-[var(--ty-text-muted)]">
+                              {t.name || t.type}
+                            </span>
+                          ))}
+                          {c.tests.length > 3 && (
+                            <span className="text-[10px] text-[var(--ty-text-subtle)]">+{c.tests.length - 3}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* If executed, show assertions summary breakdown */}
+                      {c.lastResult?.assertionResults && c.lastResult.assertionResults.length > 0 && (
+                        <div className="mt-2.5 pt-2 border-t border-[var(--ty-border)]/50 space-y-1">
+                          <div className="text-[10px] text-[var(--ty-text-subtle)] font-mono uppercase tracking-wider">断言检查结果</div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                            {c.lastResult.assertionResults.map((ar, arIdx) => (
+                              <div
+                                key={arIdx}
+                                className={`flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-mono border ${
+                                  ar.passed
+                                    ? 'bg-emerald-500/5 text-emerald-400 border-emerald-500/20'
+                                    : 'bg-rose-500/5 text-rose-400 border-rose-500/20'
+                                }`}
+                              >
+                                {ar.passed ? (
+                                  <CheckCircle2 className="w-3 h-3 shrink-0" />
+                                ) : (
+                                  <XCircle className="w-3 h-3 shrink-0" />
+                                )}
+                                <span className="truncate">{ar.assertion?.name || ar.message}</span>
+                                <span className="ml-auto text-[10px] text-[var(--ty-text-subtle)]">{ar.actual}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

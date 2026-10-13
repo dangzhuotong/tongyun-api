@@ -5,6 +5,7 @@ import {
   ExtractedVariable,
   ResponsePayload,
   RequestData,
+  TestCaseItem,
 } from '../types/api';
 
 /**
@@ -342,3 +343,194 @@ ${assertionsSection}
 3. **防护建议**：指出需要强化的边界测试用例。
 `.trim();
 }
+
+/**
+ * 依据接口定义（URL、Method、参数及 JSON 结构）智能生成工业级测试用例集矩阵
+ */
+export function generateAiTestCaseSuite(request: RequestData): TestCaseItem[] {
+  const cases: TestCaseItem[] = [];
+  const baseTime = Date.now();
+
+  // 1. 🟢 标准正向用例 (Happy Path)
+  cases.push({
+    id: `case_${baseTime}_pos`,
+    name: `[正向] 标准成功请求 (200 OK)`,
+    description: `验证使用标准业务参数能够正常请求并返回期望的成功响应`,
+    category: 'positive',
+    params: JSON.parse(JSON.stringify(request.params || [])),
+    headers: JSON.parse(JSON.stringify(request.headers || [])),
+    body: JSON.parse(JSON.stringify(request.body || { body_type: 'none', content: '' })),
+    auth: JSON.parse(JSON.stringify(request.auth || { auth_type: 'none' })),
+    tests: [
+      {
+        id: `test_${baseTime}_1`,
+        name: request.method === 'POST' ? '创建成功或返回 200/201' : '状态码为 200',
+        type: request.method === 'POST' ? 'status_in_range' : 'status_equals',
+        expected: request.method === 'POST' ? '200-201' : '200',
+        enabled: true,
+      },
+      {
+        id: `test_${baseTime}_2`,
+        name: '响应耗时在 1500ms 内',
+        type: 'time_less_than',
+        expected: '1500',
+        enabled: true,
+      },
+    ],
+  });
+
+  // 2. 🟡 必填字段缺失 / 空参数校验 (400 Bad Request)
+  let missingBody = JSON.parse(JSON.stringify(request.body || { body_type: 'none', content: '' }));
+  let missingParams = JSON.parse(JSON.stringify(request.params || []));
+  if (missingBody.body_type === 'json' && missingBody.content.trim()) {
+    try {
+      const obj = JSON.parse(missingBody.content);
+      if (typeof obj === 'object' && obj !== null && !Array.isArray(obj)) {
+        const keys = Object.keys(obj);
+        if (keys.length > 0) {
+          const clone = { ...obj };
+          delete clone[keys[0]];
+          missingBody.content = JSON.stringify(clone, null, 2);
+        } else {
+          missingBody.content = '{}';
+        }
+      }
+    } catch {
+      missingBody.content = '{}';
+    }
+  } else if (missingParams.length > 0) {
+    missingParams = [];
+  }
+
+  cases.push({
+    id: `case_${baseTime}_missing`,
+    name: `[逆向] 必填参数缺失或置空 (400)`,
+    description: `验证服务端参数校验器能否正确拦截不完整请求并返回 400/422`,
+    category: 'negative',
+    params: missingParams,
+    headers: JSON.parse(JSON.stringify(request.headers || [])),
+    body: missingBody,
+    auth: JSON.parse(JSON.stringify(request.auth || { auth_type: 'none' })),
+    tests: [
+      {
+        id: `test_${baseTime}_3`,
+        name: '状态码处于 400-422 错误拦截区间',
+        type: 'status_in_range',
+        expected: '400-422',
+        enabled: true,
+      },
+    ],
+  });
+
+  // 3. 🔴 边界值与类型异常 (Boundary & Type Check)
+  let boundaryBody = JSON.parse(JSON.stringify(request.body || { body_type: 'none', content: '' }));
+  let boundaryParams = JSON.parse(JSON.stringify(request.params || []));
+  if (boundaryBody.body_type === 'json' && boundaryBody.content.trim()) {
+    try {
+      const obj = JSON.parse(boundaryBody.content);
+      if (typeof obj === 'object' && obj !== null && !Array.isArray(obj)) {
+        const clone = { ...obj };
+        for (const k of Object.keys(clone)) {
+          if (typeof clone[k] === 'number') {
+            clone[k] = -99999999;
+          } else if (typeof clone[k] === 'string') {
+            clone[k] = 'A'.repeat(500);
+          }
+        }
+        boundaryBody.content = JSON.stringify(clone, null, 2);
+      }
+    } catch {
+      // ignore
+    }
+  } else if (boundaryParams.length > 0) {
+    boundaryParams = boundaryParams.map((p: any) => ({ ...p, value: '-9999999999' }));
+  }
+
+  cases.push({
+    id: `case_${baseTime}_boundary`,
+    name: `[边界] 极端数值与超长字符输入`,
+    description: `传入越界参数与超长内容，验证服务端是否存在内存溢出或未捕获崩溃`,
+    category: 'boundary',
+    params: boundaryParams,
+    headers: JSON.parse(JSON.stringify(request.headers || [])),
+    body: boundaryBody,
+    auth: JSON.parse(JSON.stringify(request.auth || { auth_type: 'none' })),
+    tests: [
+      {
+        id: `test_${baseTime}_4`,
+        name: '响应状态码非 500 (杜绝未捕获服务端异常)',
+        type: 'status_in_range',
+        expected: '200-499',
+        enabled: true,
+      },
+    ],
+  });
+
+  // 4. 🔒 未授权拦截校验 (401 Unauthorized)
+  const noAuthHeaders = (request.headers || []).filter(
+    h => !h.key.toLowerCase().includes('auth') && !h.key.toLowerCase().includes('token')
+  );
+  cases.push({
+    id: `case_${baseTime}_auth`,
+    name: `[安全] 无授权凭证访问 (401 拦截)`,
+    description: `清空令牌或请求头 Authorization，验证安全认证拦截器与鉴权防护`,
+    category: 'security',
+    params: JSON.parse(JSON.stringify(request.params || [])),
+    headers: noAuthHeaders,
+    body: JSON.parse(JSON.stringify(request.body || { body_type: 'none', content: '' })),
+    auth: { auth_type: 'none' },
+    tests: [
+      {
+        id: `test_${baseTime}_5`,
+        name: '返回 401 Unauthorized 或 403 Forbidden',
+        type: 'status_in_range',
+        expected: '401-403',
+        enabled: true,
+      },
+    ],
+  });
+
+  return cases;
+}
+
+/**
+ * 将测试用例集导出为符合 IntelliJ IDEA HTTP Client 规范的纯文本 .http 文件
+ */
+export function exportTestCasesToHttp(request: RequestData, cases: TestCaseItem[]): string {
+  const blocks: string[] = [];
+
+  for (const c of cases) {
+    const lines: string[] = [];
+    lines.push(`### ${c.name}`);
+    lines.push(`# @name ${c.id}`);
+    if (c.description) {
+      lines.push(`# ${c.description}`);
+    }
+
+    // URL with params
+    let url = request.url;
+    const activeParams = (c.params || []).filter(p => p.enabled && p.key);
+    if (activeParams.length > 0) {
+      const qs = activeParams.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&');
+      url += (url.includes('?') ? '&' : '?') + qs;
+    }
+    lines.push(`${request.method} ${url}`);
+
+    // Headers
+    const activeHeaders = (c.headers || []).filter(h => h.enabled && h.key);
+    for (const h of activeHeaders) {
+      lines.push(`${h.key}: ${h.value}`);
+    }
+
+    // Body
+    if (c.body && c.body.body_type !== 'none' && c.body.content.trim()) {
+      lines.push('');
+      lines.push(c.body.content.trim());
+    }
+
+    blocks.push(lines.join('\n'));
+  }
+
+  return blocks.join('\n\n');
+}
+

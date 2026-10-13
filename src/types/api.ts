@@ -87,6 +87,26 @@ export interface ExtractedVariable {
   source: string;
 }
 
+export interface TestCaseItem {
+  id: string;
+  name: string;
+  description?: string;
+  category: 'positive' | 'negative' | 'boundary' | 'security';
+  params: KeyValueItem[];
+  headers: KeyValueItem[];
+  body: RequestBody;
+  auth: RequestAuth;
+  tests: RequestAssertion[];
+  lastResult?: {
+    passed: boolean;
+    status: number;
+    timeMs: number;
+    timestamp: number;
+    assertionResults: AssertionResult[];
+    error?: string;
+  };
+}
+
 export interface RequestData {
   id: string;
   name: string;
@@ -101,6 +121,8 @@ export interface RequestData {
   redirect_policy?: RedirectPolicy;
   description?: string;
   filePath?: string;
+  cases?: TestCaseItem[];
+  activeCaseId?: string;
 }
 
 export interface ResponsePayload {
