@@ -1,0 +1,16 @@
+{
+  "id": "req_delay_demo",
+  "name": "延迟测量 (Delay 1s)",
+  "method": "GET",
+  "url": "{{baseUrl}}/delay/1",
+  "headers": [],
+  "params": [],
+  "body": {
+    "body_type": "none",
+    "content": ""
+  },
+  "auth": {
+    "auth_type": "none"
+  },
+  "description": "服务端人为延迟 1 秒返回，用于验证前端时延与进度交互"
+}

@@ -1,0 +1,21 @@
+{
+  "id": "production",
+  "name": "生产正式环境",
+  "variables": [
+    {
+      "key": "baseUrl",
+      "value": "https://httpbin.org",
+      "enabled": true
+    },
+    {
+      "key": "apiToken",
+      "value": "ty_token_prod_secret",
+      "enabled": true
+    },
+    {
+      "key": "userId",
+      "value": "8888",
+      "enabled": true
+    }
+  ]
+}

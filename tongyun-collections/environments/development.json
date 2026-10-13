@@ -1,0 +1,21 @@
+{
+  "id": "development",
+  "name": "本地与开发环境",
+  "variables": [
+    {
+      "key": "baseUrl",
+      "value": "https://httpbin.org",
+      "enabled": true
+    },
+    {
+      "key": "apiToken",
+      "value": "ty_token_dev_8899",
+      "enabled": true
+    },
+    {
+      "key": "userId",
+      "value": "1001",
+      "enabled": true
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "id": "req_post_demo",
+  "name": "POST测试 (JSON Body)",
+  "method": "POST",
+  "url": "{{baseUrl}}/post",
+  "headers": [
+    {
+      "key": "Content-Type",
+      "value": "application/json",
+      "enabled": true,
+      "description": "JSON 请求体"
+    }
+  ],
+  "params": [],
+  "body": {
+    "body_type": "json",
+    "content": "{\n  \"appName\": \"tongyun-api\",\n  \"version\": \"0.1.0\",\n  \"features\": [\n    \"纯文本存储\",\n    \"Git友好\",\n    \"免CORS原生请求\",\n    \"毫秒级响应测量\"\n  ]\n}"
+  },
+  "auth": {
+    "auth_type": "none"
+  },
+  "description": "演示 POST JSON Body 的序列化与格式化调试"
+}

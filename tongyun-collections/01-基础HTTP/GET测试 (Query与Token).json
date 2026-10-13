@@ -1,0 +1,43 @@
+{
+  "id": "req_get_demo",
+  "name": "GET测试 (Query与Token)",
+  "method": "GET",
+  "url": "{{baseUrl}}/get",
+  "headers": [
+    {
+      "key": "Accept",
+      "value": "application/json",
+      "enabled": true,
+      "description": "接收JSON响应"
+    },
+    {
+      "key": "User-Agent",
+      "value": "TongyunAPI/1.0",
+      "enabled": true,
+      "description": "自定义UA"
+    }
+  ],
+  "params": [
+    {
+      "key": "userId",
+      "value": "{{userId}}",
+      "enabled": true,
+      "description": "从环境变量获取"
+    },
+    {
+      "key": "lang",
+      "value": "zh-CN",
+      "enabled": true,
+      "description": "界面语言"
+    }
+  ],
+  "body": {
+    "body_type": "none",
+    "content": ""
+  },
+  "auth": {
+    "auth_type": "bearer",
+    "token": "{{apiToken}}"
+  },
+  "description": "演示带环境变量、Query 参数与 Bearer Token 的 GET 接口"
+}
