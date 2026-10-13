@@ -23,9 +23,22 @@ pub struct RequestAuth {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FormDataItem {
+    pub id: String,
+    pub key: String,
+    pub value: String,
+    #[serde(rename = "type")]
+    pub item_type: String, // "text" | "file"
+    pub file_name: Option<String>,
+    pub file_path: Option<String>,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RequestBody {
-    pub body_type: String, // "none" | "json" | "raw" | "form-urlencoded"
+    pub body_type: String, // "none" | "json" | "raw" | "form-urlencoded" | "form-data"
     pub content: String,
+    pub form_data: Option<Vec<FormDataItem>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -38,6 +51,7 @@ pub struct RequestData {
     pub params: Vec<KeyValueItem>,
     pub body: RequestBody,
     pub auth: RequestAuth,
+    pub redirect_policy: Option<String>,
     pub description: Option<String>,
 }
 
@@ -50,6 +64,7 @@ pub struct RequestExecutePayload {
     pub body: RequestBody,
     pub auth: RequestAuth,
     pub timeout_ms: Option<u64>,
+    pub redirect_policy: Option<String>, // "safe" | "follow" | "manual"
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -107,9 +122,31 @@ fn get_workspace_path(custom_path: Option<String>) -> Result<String, String> {
 
 #[tauri::command]
 async fn execute_http_request(payload: RequestExecutePayload) -> Result<ResponsePayload, String> {
+    let redirect_policy = match payload.redirect_policy.as_deref() {
+        Some("manual") => reqwest::redirect::Policy::none(),
+        Some("follow") => reqwest::redirect::Policy::limited(10),
+        _ => reqwest::redirect::Policy::custom(|attempt| {
+            if attempt.previous().len() >= 10 {
+                return attempt.error("重定向次数过多");
+            }
+            let Some(previous) = attempt.previous().last() else {
+                return attempt.follow();
+            };
+            let next = attempt.url();
+            if previous.scheme() == next.scheme()
+                && previous.host_str() == next.host_str()
+                && previous.port_or_known_default() == next.port_or_known_default()
+            {
+                attempt.follow()
+            } else {
+                attempt.stop()
+            }
+        }),
+    };
+
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_millis(payload.timeout_ms.unwrap_or(30000)))
-        .redirect(reqwest::redirect::Policy::limited(10))
+        .redirect(redirect_policy)
         .build()
         .map_err(|e| format!("构建 HTTP 客户端失败: {}", e))?;
 
@@ -193,6 +230,30 @@ async fn execute_http_request(payload: RequestExecutePayload) -> Result<Response
             req_builder = req_builder
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .body(payload.body.content);
+        }
+        "form-data" => {
+            if let Some(items) = &payload.body.form_data {
+                let mut form = reqwest::multipart::Form::new();
+                for item in items.iter().filter(|i| i.enabled && !i.key.trim().is_empty()) {
+                    if item.item_type == "file" {
+                        if let Some(path_str) = &item.file_path {
+                            let p = std::path::Path::new(path_str);
+                            if p.exists() {
+                                if let Ok(bytes) = std::fs::read(p) {
+                                    let filename = item.file_name.clone().unwrap_or_else(|| {
+                                        p.file_name().unwrap_or_default().to_string_lossy().to_string()
+                                    });
+                                    let part = reqwest::multipart::Part::bytes(bytes).file_name(filename);
+                                    form = form.part(item.key.clone(), part);
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                    form = form.text(item.key.clone(), item.value.clone());
+                }
+                req_builder = req_builder.multipart(form);
+            }
         }
         _ => {}
     }
@@ -378,6 +439,7 @@ fn read_request_file(file_path: String) -> Result<RequestData, String> {
         body: RequestBody {
             body_type,
             content: body_trimmed.to_string(),
+            form_data: None,
         },
         auth: RequestAuth {
             auth_type: "none".to_string(),
@@ -388,6 +450,7 @@ fn read_request_file(file_path: String) -> Result<RequestData, String> {
             api_key_value: None,
             api_key_in: None,
         },
+        redirect_policy: None,
         description: Some("源自 .http 纯文本规范文件".to_string()),
     })
 }
@@ -457,6 +520,7 @@ fn create_file_or_folder(
             body: RequestBody {
                 body_type: "none".to_string(),
                 content: String::new(),
+                form_data: None,
             },
             auth: RequestAuth {
                 auth_type: "none".to_string(),
@@ -467,6 +531,7 @@ fn create_file_or_folder(
                 api_key_value: None,
                 api_key_in: None,
             },
+            redirect_policy: None,
             description: Some("新建请求".to_string()),
         });
         let formatted = serde_json::to_string_pretty(&data).map_err(|e| format!("序列化失败: {}", e))?;
@@ -640,6 +705,7 @@ fn init_sample_workspace(workspace_path: Option<String>) -> Result<String, Strin
         body: RequestBody {
             body_type: "none".to_string(),
             content: String::new(),
+            form_data: None,
         },
         auth: RequestAuth {
             auth_type: "bearer".to_string(),
@@ -650,6 +716,7 @@ fn init_sample_workspace(workspace_path: Option<String>) -> Result<String, Strin
             api_key_value: None,
             api_key_in: None,
         },
+        redirect_policy: None,
         description: Some("演示带环境变量、Query 参数与 Bearer Token 的 GET 请求".to_string()),
     };
     let req1_path = dir1.join("GET测试 (Query参数).json");
@@ -674,6 +741,7 @@ fn init_sample_workspace(workspace_path: Option<String>) -> Result<String, Strin
         body: RequestBody {
             body_type: "json".to_string(),
             content: "{\n  \"appName\": \"tongyun-api\",\n  \"version\": \"0.1.0\",\n  \"features\": [\n    \"纯文本存储\",\n    \"Git友好\",\n    \"毫秒级响应测量\"\n  ]\n}".to_string(),
+            form_data: None,
         },
         auth: RequestAuth {
             auth_type: "none".to_string(),
@@ -684,6 +752,7 @@ fn init_sample_workspace(workspace_path: Option<String>) -> Result<String, Strin
             api_key_value: None,
             api_key_in: None,
         },
+        redirect_policy: None,
         description: Some("演示 POST 请求体发送与格式化".to_string()),
     };
     let req2_path = dir1.join("POST测试 (JSON Body).json");
@@ -703,6 +772,7 @@ fn init_sample_workspace(workspace_path: Option<String>) -> Result<String, Strin
         body: RequestBody {
             body_type: "none".to_string(),
             content: String::new(),
+            form_data: None,
         },
         auth: RequestAuth {
             auth_type: "none".to_string(),
@@ -713,6 +783,7 @@ fn init_sample_workspace(workspace_path: Option<String>) -> Result<String, Strin
             api_key_value: None,
             api_key_in: None,
         },
+        redirect_policy: None,
         description: Some("测试耗时时延测量功能，验证进度条与耗时徽标".to_string()),
     };
     let req3_path = dir2.join("延迟响应测量 (Delay 1s).json");

@@ -42,6 +42,8 @@ export const getMethodBadgeColor = (method?: string) => {
       return 'text-rose-400 bg-rose-500/10 border-rose-500/30';
     case 'PATCH':
       return 'text-purple-400 bg-purple-500/10 border-purple-500/30';
+    case 'WS':
+      return 'text-emerald-300 bg-emerald-500/15 border-emerald-500/30 font-semibold';
     default:
       return 'text-slate-400 bg-slate-500/10 border-slate-500/30';
   }

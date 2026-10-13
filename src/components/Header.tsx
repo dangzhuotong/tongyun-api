@@ -63,19 +63,19 @@ export const Header: React.FC<HeaderProps> = ({
   const shortWs = workspacePath.length > 28 ? '...' + workspacePath.slice(-25) : workspacePath;
 
   return (
-    <header className="h-14 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between px-4 select-none shrink-0 backdrop-blur z-20">
+    <header className="h-14 bg-[var(--ty-surface)] border-b border-[var(--ty-border)] flex items-center justify-between px-4 select-none shrink-0 z-20">
       {/* Brand & Workspace & Git Branch */}
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 font-bold text-slate-100 tracking-wide">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 via-sky-500 to-emerald-400 p-[1px] flex items-center justify-center shadow-lg shadow-sky-500/20">
-            <div className="w-full h-full bg-slate-950 rounded-[7px] flex items-center justify-center">
-              <Cloud className="w-4 h-4 text-sky-400" />
+        <div className="flex items-center gap-2 font-bold text-[var(--ty-text)] tracking-wide">
+          <div className="w-8 h-8 rounded-lg bg-[var(--ty-matcha-tint)] border border-[var(--ty-matcha-soft)] p-[1px] flex items-center justify-center shadow-sm">
+            <div className="w-full h-full bg-[var(--ty-surface)] rounded-[7px] flex items-center justify-center">
+              <Cloud className="w-4 h-4 text-[var(--ty-matcha)]" />
             </div>
           </div>
-          <span className="text-sm font-semibold bg-gradient-to-r from-sky-400 to-indigo-300 bg-clip-text text-transparent">
+          <span className="text-sm font-semibold text-[var(--ty-text)]">
             橦云 API
           </span>
-          <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--ty-matcha-tint)] text-[var(--ty-matcha)] border border-[var(--ty-matcha-soft)]">
             v0.1·Git
           </span>
         </div>
@@ -230,11 +230,11 @@ export const Header: React.FC<HeaderProps> = ({
           {isDirty && <span className="text-[10px] text-amber-400">*</span>}
         </button>
 
-        {/* Send Button */}
+        {/* Send Button (Matcha Green) */}
         <button
           onClick={onSendRequest}
           disabled={isSending}
-          className="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white text-xs font-semibold shadow-md shadow-sky-500/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-[var(--ty-matcha)] hover:bg-[var(--ty-matcha-hover)] text-white text-xs font-semibold shadow-sm active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           title="发送请求 (Ctrl+Enter)"
         >
           {isSending ? (

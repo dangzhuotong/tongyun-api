@@ -847,29 +847,47 @@ export const App: React.FC = () => {
             onNewTab={handleNewTab}
           />
 
-          {/* Top half: Request Editor */}
-          <div className="h-[52%] flex flex-col min-h-[300px]">
-            <RequestEditor
-              request={currentRequest}
-              environment={activeEnvironment}
-              onChange={handleUpdateRequest}
-              onSend={() => handleSendRequest()}
-              isSending={isSending}
-              onOpenCodeSnippet={() => setIsCodeModalOpen(true)}
-              lastResponse={response}
-              onToast={showToast}
-            />
-          </div>
+          {/* Main Workspace: WS gets full viewport, HTTP gets split editor + response */}
+          {currentRequest.method === 'WS' ? (
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+              <RequestEditor
+                request={currentRequest}
+                environment={activeEnvironment}
+                onChange={handleUpdateRequest}
+                onSend={() => handleSendRequest()}
+                isSending={isSending}
+                onOpenCodeSnippet={() => setIsCodeModalOpen(true)}
+                lastResponse={response}
+                onToast={showToast}
+              />
+            </div>
+          ) : (
+            <>
+              {/* Top half: Request Editor */}
+              <div className="h-[52%] flex flex-col min-h-[300px]">
+                <RequestEditor
+                  request={currentRequest}
+                  environment={activeEnvironment}
+                  onChange={handleUpdateRequest}
+                  onSend={() => handleSendRequest()}
+                  isSending={isSending}
+                  onOpenCodeSnippet={() => setIsCodeModalOpen(true)}
+                  lastResponse={response}
+                  onToast={showToast}
+                />
+              </div>
 
-          {/* Bottom half: Response Viewer */}
-          <div className="flex-1 flex flex-col min-h-[240px]">
-            <ResponseViewer
-              response={response}
-              isSending={isSending}
-              currentRequest={currentRequest}
-              onCopyAiPrompt={handleCopyAiPrompt}
-            />
-          </div>
+              {/* Bottom half: Response Viewer */}
+              <div className="flex-1 flex flex-col min-h-[240px]">
+                <ResponseViewer
+                  response={response}
+                  isSending={isSending}
+                  currentRequest={currentRequest}
+                  onCopyAiPrompt={handleCopyAiPrompt}
+                />
+              </div>
+            </>
+          )}
         </main>
       </div>
 

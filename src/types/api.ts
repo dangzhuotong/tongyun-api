@@ -1,4 +1,4 @@
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS' | 'WS';
 
 export interface KeyValueItem {
   key: string;
@@ -19,11 +19,34 @@ export interface RequestAuth {
   api_key_in?: 'header' | 'query';
 }
 
-export type BodyType = 'none' | 'json' | 'raw' | 'form-urlencoded';
+export type BodyType = 'none' | 'json' | 'raw' | 'form-urlencoded' | 'form-data';
+
+export interface FormDataItem {
+  id?: string;
+  key: string;
+  value: string;
+  type: 'text' | 'file';
+  fileName?: string;
+  filePath?: string;
+  enabled: boolean;
+  description?: string;
+}
 
 export interface RequestBody {
   body_type: BodyType;
   content: string;
+  form_data?: FormDataItem[];
+}
+
+export type RedirectPolicy = 'safe' | 'follow' | 'manual';
+
+export interface WsMessageItem {
+  id: string;
+  direction: 'sent' | 'received';
+  timestamp: number;
+  data: string;
+  size: number;
+  isJson?: boolean;
 }
 
 export type AssertionType =
@@ -75,6 +98,7 @@ export interface RequestData {
   auth: RequestAuth;
   tests?: RequestAssertion[];
   extracts?: VariableExtraction[];
+  redirect_policy?: RedirectPolicy;
   description?: string;
   filePath?: string;
 }

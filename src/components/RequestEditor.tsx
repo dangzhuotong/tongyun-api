@@ -11,7 +11,12 @@ import {
   CheckSquare,
   Variable,
   Sparkles,
-  Bot
+  Bot,
+  Settings,
+  Upload,
+  FileUp,
+  Shield,
+  Radio
 } from 'lucide-react';
 import {
   RequestData,
@@ -21,11 +26,14 @@ import {
   RequestAssertion,
   VariableExtraction,
   AssertionType,
-  ResponsePayload
+  ResponsePayload,
+  FormDataItem,
+  RedirectPolicy
 } from '../types/api';
 import { exportToCurl } from '../utils/curl';
 import { generateSmartAssertions } from '../utils/tester';
 import { getMethodBadgeColor } from './Sidebar';
+import { WebSocketPanel } from './WebSocketPanel';
 
 interface RequestEditorProps {
   request: RequestData;
@@ -48,7 +56,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
   lastResponse,
   onToast,
 }) => {
-  const [activeTab, setActiveTab] = useState<'params' | 'headers' | 'auth' | 'body' | 'tests' | 'docs'>('params');
+  const [activeTab, setActiveTab] = useState<'params' | 'headers' | 'auth' | 'body' | 'tests' | 'docs' | 'settings'>('params');
   const [copiedCurl, setCopiedCurl] = useState(false);
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [aiPromptInput, setAiPromptInput] = useState('');
@@ -75,6 +83,43 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
         extracts: [
           { id: 'e1', var_name: 'token', source: 'json' as const, path_or_key: 'json.client', enabled: true },
         ],
+      },
+    },
+    {
+      label: '📎 Multipart 文件上传',
+      data: {
+        name: '表单与文件附件上传',
+        method: 'POST' as HttpMethod,
+        url: 'https://httpbin.org/post',
+        headers: [],
+        params: [],
+        body: {
+          body_type: 'form-data' as BodyType,
+          content: '',
+          form_data: [
+            { key: 'username', value: 'tongyun_dev', type: 'text' as const, enabled: true, description: '文本字段' },
+            { key: 'avatar', value: 'avatar.png', type: 'file' as const, enabled: true, description: '二进制文件附件' },
+          ],
+        },
+        auth: { auth_type: 'none' as const },
+        tests: [
+          { id: 't1', name: '状态码为 200', type: 'status_equals' as const, expected: '200', enabled: true },
+        ],
+        extracts: [],
+      },
+    },
+    {
+      label: '📡 WebSocket 实时通道',
+      data: {
+        name: 'WebSocket 实时测试',
+        method: 'WS' as HttpMethod,
+        url: 'wss://echo.websocket.events',
+        headers: [],
+        params: [],
+        body: { body_type: 'none' as BodyType, content: '' },
+        auth: { auth_type: 'none' as const },
+        tests: [],
+        extracts: [],
       },
     },
     {
@@ -323,6 +368,27 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
     updateField('extracts', currentExtracts);
   };
 
+  // Form-Data 操作
+  const handleAddFormData = (type: 'text' | 'file' = 'text') => {
+    const current = request.body.form_data || [];
+    const updated: FormDataItem[] = [
+      ...current,
+      { key: '', value: '', type, enabled: true }
+    ];
+    updateField('body', { ...request.body, form_data: updated });
+  };
+
+  const handleUpdateFormData = (index: number, updatedItem: FormDataItem) => {
+    const current = [...(request.body.form_data || [])];
+    current[index] = updatedItem;
+    updateField('body', { ...request.body, form_data: current });
+  };
+
+  const handleDeleteFormData = (index: number) => {
+    const current = (request.body.form_data || []).filter((_, i) => i !== index);
+    updateField('body', { ...request.body, form_data: current });
+  };
+
   const activeParamsCount = request.params.filter(p => p.enabled && p.key.trim()).length;
   const activeHeadersCount = request.headers.filter(h => h.enabled && h.key.trim()).length;
   const activeTestsCount = (request.tests?.filter(t => t.enabled).length || 0) + (request.extracts?.filter(e => e.enabled).length || 0);
@@ -377,7 +443,18 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
         {/* Method selector */}
         <select
           value={request.method}
-          onChange={e => updateField('method', e.target.value as HttpMethod)}
+          onChange={e => {
+            const newMethod = e.target.value as HttpMethod;
+            if (newMethod === 'WS' && (!request.url || request.url.startsWith('http://') || request.url.startsWith('https://'))) {
+              const wsUrl = request.url ? request.url.replace(/^http:\/\//, 'ws://').replace(/^https:\/\//, 'wss://') : 'wss://echo.websocket.events';
+              onChange({ ...request, method: newMethod, url: wsUrl });
+            } else if (newMethod !== 'WS' && (request.url.startsWith('ws://') || request.url.startsWith('wss://'))) {
+              const httpUrl = request.url.replace(/^ws:\/\//, 'http://').replace(/^wss:\/\//, 'https://');
+              onChange({ ...request, method: newMethod, url: httpUrl });
+            } else {
+              updateField('method', newMethod);
+            }
+          }}
           className={`font-mono text-xs font-bold py-2 px-2.5 rounded-md border outline-none bg-slate-900 cursor-pointer ${getMethodBadgeColor(
             request.method
           )}`}
@@ -387,6 +464,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
           <option value="PUT" className="bg-slate-900 text-sky-400">PUT</option>
           <option value="DELETE" className="bg-slate-900 text-rose-400">DELETE</option>
           <option value="PATCH" className="bg-slate-900 text-purple-400">PATCH</option>
+          <option value="WS" className="bg-slate-900 text-emerald-300 font-bold">WS (WebSocket)</option>
           <option value="HEAD" className="bg-slate-900 text-slate-300">HEAD</option>
           <option value="OPTIONS" className="bg-slate-900 text-slate-300">OPTIONS</option>
         </select>
@@ -397,9 +475,9 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
             type="text"
             value={request.url}
             onChange={e => updateField('url', e.target.value)}
-            placeholder="输入请求 URL 或 {{baseUrl}}/api/v1/..."
+            placeholder={request.method === 'WS' ? "输入 WebSocket 链接 (如 wss://echo.websocket.events)" : "输入请求 URL 或 {{baseUrl}}/api/v1/..."}
             onKeyDown={e => {
-              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && request.method !== 'WS') {
                 onSend();
               }
             }}
@@ -408,26 +486,28 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
         </div>
 
         {/* Quick Copy cURL */}
-        <button
-          onClick={handleCopyCurl}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 transition-colors"
-          title="复制为完整 cURL 命令"
-        >
-          {copiedCurl ? (
-            <>
-              <Check className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-emerald-400">已复制</span>
-            </>
-          ) : (
-            <>
-              <Copy className="w-3.5 h-3.5" />
-              <span>cURL</span>
-            </>
-          )}
-        </button>
+        {request.method !== 'WS' && (
+          <button
+            onClick={handleCopyCurl}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 transition-colors"
+            title="复制为完整 cURL 命令"
+          >
+            {copiedCurl ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-emerald-400">已复制</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5" />
+                <span>cURL</span>
+              </>
+            )}
+          </button>
+        )}
 
         {/* Code Generator Modal Trigger */}
-        {onOpenCodeSnippet && (
+        {onOpenCodeSnippet && request.method !== 'WS' && (
           <button
             onClick={onOpenCodeSnippet}
             className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 transition-colors"
@@ -438,115 +518,151 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
           </button>
         )}
 
-        {/* Send Button */}
-        <button
-          onClick={onSend}
-          disabled={isSending}
-          className="flex items-center gap-1.5 px-5 py-2 rounded-md bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white text-xs font-semibold shadow-md shadow-sky-500/20 active:scale-95 transition-all disabled:opacity-50"
-          title="发送请求 (Ctrl+Enter)"
-        >
-          {isSending ? (
-            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <Play className="w-3.5 h-3.5 fill-white" />
-          )}
-          <span>{isSending ? '发送中...' : '发送'}</span>
-        </button>
+        {/* Send / WS Indicator Button */}
+        {request.method === 'WS' ? (
+          <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-[var(--ty-radius-xs,4px)] bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-mono select-none">
+            <Radio className="w-3.5 h-3.5 animate-pulse" />
+            <span>WebSocket 模式</span>
+          </div>
+        ) : (
+          <button
+            onClick={onSend}
+            disabled={isSending}
+            className="flex items-center gap-1.5 px-5 py-2 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-matcha,#6fad84)] hover:bg-[#5b956f] text-[#141518] text-xs font-semibold shadow-sm active:scale-95 transition-all disabled:opacity-50"
+            title="发送请求 (Ctrl+Enter)"
+          >
+            {isSending ? (
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Play className="w-3.5 h-3.5 fill-[#141518]" />
+            )}
+            <span>{isSending ? '发送中...' : '发送'}</span>
+          </button>
+        )}
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center border-b border-slate-800 px-4 bg-slate-950/20 text-xs gap-4">
-        <button
-          onClick={() => setActiveTab('params')}
-          className={`py-2.5 font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
-            activeTab === 'params'
-              ? 'text-sky-400 border-sky-400'
-              : 'text-slate-400 border-transparent hover:text-slate-200'
-          }`}
-        >
-          <span>Params (查询参数)</span>
-          {activeParamsCount > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-sky-500/20 text-sky-300 font-mono">
-              {activeParamsCount}
-            </span>
-          )}
-        </button>
+      {/* When method === 'WS', render the dedicated WebSocket debug console */}
+      {request.method === 'WS' ? (
+        <div className="flex-1 overflow-hidden">
+          <WebSocketPanel
+            url={request.url}
+            onChangeUrl={newUrl => updateField('url', newUrl)}
+            environment={environment}
+            onToast={onToast}
+          />
+        </div>
+      ) : (
+        <>
+          {/* Tabs */}
+          <div className="flex items-center border-b border-slate-800 px-4 bg-slate-950/20 text-xs gap-4">
+            <button
+              onClick={() => setActiveTab('params')}
+              className={`py-2.5 font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
+                activeTab === 'params'
+                  ? 'text-sky-400 border-sky-400'
+                  : 'text-slate-400 border-transparent hover:text-slate-200'
+              }`}
+            >
+              <span>Params (查询参数)</span>
+              {activeParamsCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-sky-500/20 text-sky-300 font-mono">
+                  {activeParamsCount}
+                </span>
+              )}
+            </button>
 
-        <button
-          onClick={() => setActiveTab('headers')}
-          className={`py-2.5 font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
-            activeTab === 'headers'
-              ? 'text-sky-400 border-sky-400'
-              : 'text-slate-400 border-transparent hover:text-slate-200'
-          }`}
-        >
-          <span>Headers (请求头)</span>
-          {activeHeadersCount > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-sky-500/20 text-sky-300 font-mono">
-              {activeHeadersCount}
-            </span>
-          )}
-        </button>
+            <button
+              onClick={() => setActiveTab('headers')}
+              className={`py-2.5 font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
+                activeTab === 'headers'
+                  ? 'text-sky-400 border-sky-400'
+                  : 'text-slate-400 border-transparent hover:text-slate-200'
+              }`}
+            >
+              <span>Headers (请求头)</span>
+              {activeHeadersCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-sky-500/20 text-sky-300 font-mono">
+                  {activeHeadersCount}
+                </span>
+              )}
+            </button>
 
-        <button
-          onClick={() => setActiveTab('auth')}
-          className={`py-2.5 font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
-            activeTab === 'auth'
-              ? 'text-sky-400 border-sky-400'
-              : 'text-slate-400 border-transparent hover:text-slate-200'
-          }`}
-        >
-          <span>Auth (鉴权)</span>
-          {request.auth.auth_type !== 'none' && (
-            <span className="px-1.5 py-0.2 rounded text-[10px] bg-purple-500/20 text-purple-300 font-mono uppercase">
-              {request.auth.auth_type}
-            </span>
-          )}
-        </button>
+            <button
+              onClick={() => setActiveTab('auth')}
+              className={`py-2.5 font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
+                activeTab === 'auth'
+                  ? 'text-sky-400 border-sky-400'
+                  : 'text-slate-400 border-transparent hover:text-slate-200'
+              }`}
+            >
+              <span>Auth (鉴权)</span>
+              {request.auth.auth_type !== 'none' && (
+                <span className="px-1.5 py-0.2 rounded text-[10px] bg-purple-500/20 text-purple-300 font-mono uppercase">
+                  {request.auth.auth_type}
+                </span>
+              )}
+            </button>
 
-        <button
-          onClick={() => setActiveTab('body')}
-          className={`py-2.5 font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
-            activeTab === 'body'
-              ? 'text-sky-400 border-sky-400'
-              : 'text-slate-400 border-transparent hover:text-slate-200'
-          }`}
-        >
-          <span>Body (请求体)</span>
-          {request.body.body_type !== 'none' && (
-            <span className="px-1.5 py-0.2 rounded text-[10px] bg-amber-500/20 text-amber-300 font-mono uppercase">
-              {request.body.body_type}
-            </span>
-          )}
-        </button>
+            <button
+              onClick={() => setActiveTab('body')}
+              className={`py-2.5 font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
+                activeTab === 'body'
+                  ? 'text-sky-400 border-sky-400'
+                  : 'text-slate-400 border-transparent hover:text-slate-200'
+              }`}
+            >
+              <span>Body (请求体)</span>
+              {request.body.body_type !== 'none' && (
+                <span className="px-1.5 py-0.2 rounded text-[10px] bg-amber-500/20 text-amber-300 font-mono uppercase">
+                  {request.body.body_type}
+                </span>
+              )}
+            </button>
 
-        <button
-          onClick={() => setActiveTab('tests')}
-          className={`py-2.5 font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
-            activeTab === 'tests'
-              ? 'text-sky-400 border-sky-400'
-              : 'text-slate-400 border-transparent hover:text-slate-200'
-          }`}
-        >
-          <span>断言与测试</span>
-          {activeTestsCount > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 font-mono">
-              {activeTestsCount}
-            </span>
-          )}
-        </button>
+            <button
+              onClick={() => setActiveTab('tests')}
+              className={`py-2.5 font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
+                activeTab === 'tests'
+                  ? 'text-sky-400 border-sky-400'
+                  : 'text-slate-400 border-transparent hover:text-slate-200'
+              }`}
+            >
+              <span>断言与测试</span>
+              {activeTestsCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 font-mono">
+                  {activeTestsCount}
+                </span>
+              )}
+            </button>
 
-        <button
-          onClick={() => setActiveTab('docs')}
-          className={`py-2.5 font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
-            activeTab === 'docs'
-              ? 'text-sky-400 border-sky-400'
-              : 'text-slate-400 border-transparent hover:text-slate-200'
-          }`}
-        >
-          <span>信息与文档</span>
-        </button>
-      </div>
+            <button
+              onClick={() => setActiveTab('docs')}
+              className={`py-2.5 font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
+                activeTab === 'docs'
+                  ? 'text-sky-400 border-sky-400'
+                  : 'text-slate-400 border-transparent hover:text-slate-200'
+              }`}
+            >
+              <span>信息与文档</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`py-2.5 font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
+                activeTab === 'settings'
+                  ? 'text-sky-400 border-sky-400'
+                  : 'text-slate-400 border-transparent hover:text-slate-200'
+              }`}
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span>设置</span>
+              {request.redirect_policy && request.redirect_policy !== 'safe' && (
+                <span className="px-1.5 py-0.2 rounded text-[10px] bg-amber-500/20 text-amber-300 font-mono">
+                  {request.redirect_policy}
+                </span>
+              )}
+            </button>
+          </div>
 
       {/* Tab Panels */}
       <div className="flex-1 overflow-y-auto p-4">
@@ -880,7 +996,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
           <div className="space-y-3 h-full flex flex-col">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4 text-xs">
-                {(['none', 'json', 'raw', 'form-urlencoded'] as BodyType[]).map(type => (
+                {(['none', 'json', 'raw', 'form-urlencoded', 'form-data'] as BodyType[]).map(type => (
                   <label key={type} className="flex items-center gap-1.5 cursor-pointer text-slate-300">
                     <input
                       type="radio"
@@ -917,7 +1033,148 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
               )}
             </div>
 
-            {request.body.body_type !== 'none' && (
+            {request.body.body_type === 'form-data' && (
+              <div className="space-y-3 flex-1 flex flex-col min-h-0">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-slate-300">Multipart 表单项与附件列表</span>
+                    <span className="text-[11px] text-slate-500">
+                      (支持键值文本及本地磁盘二进制文件上传)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleAddFormData('text')}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-sky-400 text-xs border border-slate-700 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ 文本字段</span>
+                    </button>
+                    <button
+                      onClick={() => handleAddFormData('file')}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs border border-amber-500/30 transition-colors"
+                    >
+                      <FileUp className="w-3.5 h-3.5" />
+                      <span>+ 文件附件</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="border border-slate-800 rounded-md overflow-hidden bg-slate-950/40 flex-1 overflow-y-auto min-h-[160px]">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-900/80 text-slate-400 border-b border-slate-800 sticky top-0">
+                      <tr>
+                        <th className="w-10 px-3 py-2 text-center">启用</th>
+                        <th className="px-3 py-2 w-1/4">字段名 (Key)</th>
+                        <th className="px-3 py-2 w-28">类型 (Type)</th>
+                        <th className="px-3 py-2">字段内容 / 文件路径 (Value)</th>
+                        <th className="px-3 py-2 w-1/4">说明 (Description)</th>
+                        <th className="w-10 px-2 py-2 text-center">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {(!request.body.form_data || request.body.form_data.length === 0) ? (
+                        <tr>
+                          <td colSpan={6} className="text-center py-6 text-slate-500">
+                            暂无表单字段，点击右上角「+ 文本字段」或「+ 文件附件」添加
+                          </td>
+                        </tr>
+                      ) : (
+                        request.body.form_data.map((item, idx) => (
+                          <tr key={idx} className="hover:bg-slate-800/30">
+                            <td className="px-3 py-1.5 text-center">
+                              <input
+                                type="checkbox"
+                                checked={item.enabled}
+                                onChange={e => handleUpdateFormData(idx, { ...item, enabled: e.target.checked })}
+                                className="rounded accent-sky-500 cursor-pointer"
+                              />
+                            </td>
+                            <td className="px-2 py-1">
+                              <input
+                                type="text"
+                                value={item.key}
+                                onChange={e => handleUpdateFormData(idx, { ...item, key: e.target.value })}
+                                placeholder="字段名 (如 file, avatar)"
+                                className="w-full bg-transparent border-0 text-slate-200 font-mono text-xs focus:outline-none"
+                              />
+                            </td>
+                            <td className="px-2 py-1">
+                              <select
+                                value={item.type}
+                                onChange={e => handleUpdateFormData(idx, { ...item, type: e.target.value as 'text' | 'file' })}
+                                className={`bg-slate-900 border rounded px-1.5 py-0.5 text-[11px] font-mono outline-none ${
+                                  item.type === 'file' ? 'text-amber-300 border-amber-500/40' : 'text-sky-300 border-slate-700'
+                                }`}
+                              >
+                                <option value="text">Text (文本)</option>
+                                <option value="file">File (文件)</option>
+                              </select>
+                            </td>
+                            <td className="px-2 py-1">
+                              {item.type === 'file' ? (
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="text"
+                                    value={item.value}
+                                    onChange={e => handleUpdateFormData(idx, { ...item, value: e.target.value })}
+                                    placeholder="本地绝对路径，如 C:\data\avatar.png 或相对路径"
+                                    className="flex-1 bg-slate-900/60 border border-slate-800 rounded px-2 py-1 text-amber-200 font-mono text-xs focus:outline-none focus:border-amber-500/60"
+                                  />
+                                  <label className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-300 border border-slate-700 text-xs cursor-pointer flex items-center gap-1 shrink-0 transition-colors">
+                                    <Upload className="w-3 h-3" />
+                                    <span>浏览</span>
+                                    <input
+                                      type="file"
+                                      className="hidden"
+                                      onChange={e => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                          const path = (file as any).path || file.name;
+                                          handleUpdateFormData(idx, { ...item, value: path });
+                                        }
+                                      }}
+                                    />
+                                  </label>
+                                </div>
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={item.value}
+                                  onChange={e => handleUpdateFormData(idx, { ...item, value: e.target.value })}
+                                  placeholder="字段值，支持 {{变量}}"
+                                  className="w-full bg-transparent border-0 text-slate-200 font-mono text-xs focus:outline-none"
+                                />
+                              )}
+                            </td>
+                            <td className="px-2 py-1">
+                              <input
+                                type="text"
+                                value={item.description || ''}
+                                onChange={e => handleUpdateFormData(idx, { ...item, description: e.target.value })}
+                                placeholder="字段说明"
+                                className="w-full bg-transparent border-0 text-slate-400 text-xs focus:outline-none"
+                              />
+                            </td>
+                            <td className="px-2 py-1 text-center">
+                              <button
+                                onClick={() => handleDeleteFormData(idx)}
+                                className="text-slate-500 hover:text-rose-400 p-1"
+                                title="删除此字段"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {request.body.body_type !== 'none' && request.body.body_type !== 'form-data' && (
               <div className="flex-1 flex flex-col min-h-[220px]">
                 <textarea
                   value={request.body.content}
@@ -1241,7 +1498,92 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
             )}
           </div>
         )}
+
+        {/* SETTINGS TAB */}
+        {activeTab === 'settings' && (
+          <div className="space-y-6 max-w-3xl text-xs">
+            <div>
+              <h4 className="font-semibold text-slate-200 flex items-center gap-1.5 text-sm mb-1">
+                <Shield className="w-4 h-4 text-emerald-400" />
+                <span>3xx 重定向安全策略 (Redirect Policy)</span>
+              </h4>
+              <p className="text-[11px] text-slate-400">
+                配置发送请求遇到 HTTP 301 / 302 / 307 / 308 重定向时的跳转行为与机密数据防泄露机制。
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                {
+                  value: 'safe' as RedirectPolicy,
+                  badge: '推荐 · 默认',
+                  badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+                  title: '安全防泄露模式 (Safe)',
+                  desc: '自动跟随同域名/同主机的重定向；跨主机重定向（跳转到未知第三方域名）时自动停在 3xx 并返回，杜绝携带私密 Authorization 令牌、Cookie 或 Header 静默外泄。',
+                },
+                {
+                  value: 'follow' as RedirectPolicy,
+                  badge: '自动跟随',
+                  badgeColor: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
+                  title: '自动跟随所有重定向 (Follow)',
+                  desc: '无论同主机还是跨主机均自动跟随重定向（最多 10 跳），直接获取最终目标网址的响应内容。',
+                },
+                {
+                  value: 'manual' as RedirectPolicy,
+                  badge: '手动拦截',
+                  badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+                  title: '严格手动拦截 3xx (Manual)',
+                  desc: '严格停在 3xx 响应码，不进行任何自动跟随跳转。便于单步调试 OAuth 2.0 授权码回调、跳转 URL 及 Location 响应头。',
+                },
+              ].map(opt => {
+                const isSelected = (request.redirect_policy || 'safe') === opt.value;
+                return (
+                  <div
+                    key={opt.value}
+                    onClick={() => updateField('redirect_policy', opt.value)}
+                    className={`p-3.5 rounded-lg border cursor-pointer transition-all ${
+                      isSelected
+                        ? 'bg-slate-900/90 border-emerald-500/60 ring-1 ring-emerald-500/30'
+                        : 'bg-slate-950/40 border-slate-800 hover:border-slate-700/80 hover:bg-slate-900/40'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="redirect_policy"
+                          checked={isSelected}
+                          onChange={() => updateField('redirect_policy', opt.value)}
+                          className="accent-emerald-500"
+                        />
+                        <span className="font-semibold text-slate-100">{opt.title}</span>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono border ${opt.badgeColor}`}>
+                        {opt.badge}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 pl-5 leading-relaxed">{opt.desc}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="p-3.5 rounded-lg border border-slate-800 bg-slate-950/60 space-y-2">
+              <h5 className="font-semibold text-slate-300 flex items-center gap-1.5">
+                <Settings className="w-3.5 h-3.5 text-slate-400" />
+                <span>底层网络传输引擎规范</span>
+              </h5>
+              <div className="text-[11px] text-slate-400 space-y-1 leading-relaxed">
+                <p>• 桌面客户端采用 Rust 原生 <code className="text-slate-300 font-mono">reqwest + rustls</code> 网络栈，避免 Node/Browser 的沙盒与 CORS 跨域限制。</p>
+                <p>• 接口定义完全基于纯文本 <code className="text-slate-300 font-mono">.http</code> 与 <code className="text-slate-300 font-mono">http-client.env.json</code>，支持 Git 协同审查与版本追溯。</p>
+                <p>• 当前重定向策略配置将随接口请求状态持久化，并在批量运行器中生效。</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+        </>
+      )}
     </div>
   );
 };

@@ -353,6 +353,7 @@ export const apiClient = {
           body: resolvedBody,
           auth: resolvedAuth,
           timeout_ms: 30000,
+          redirect_policy: request.redirect_policy || 'safe',
         },
       });
     }
@@ -396,6 +397,18 @@ export const apiClient = {
           fetchOptions.body = resolvedBody.content;
         } else if (resolvedBody.body_type === 'raw' && resolvedBody.content) {
           fetchOptions.body = resolvedBody.content;
+        } else if (resolvedBody.body_type === 'form-data' && resolvedBody.form_data) {
+          const formData = new FormData();
+          for (const item of resolvedBody.form_data.filter(i => i.enabled && i.key.trim())) {
+            if (item.type === 'file' && item.fileName) {
+              const blob = new Blob([item.value || ''], { type: 'application/octet-stream' });
+              formData.append(item.key, blob, item.fileName);
+            } else {
+              formData.append(item.key, item.value);
+            }
+          }
+          delete headers['Content-Type'];
+          fetchOptions.body = formData;
         }
       }
 
