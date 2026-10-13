@@ -10,10 +10,13 @@ import { CodeSnippetModal } from './components/CodeSnippetModal';
 import { GitStatusModal } from './components/GitStatusModal';
 import { AiInspectorModal } from './components/AiInspectorModal';
 import { CollectionRunnerModal } from './components/CollectionRunnerModal';
-import { apiClient, GitStatusResult } from './services/apiClient';
+import { apiClient, GitStatusResult, isTauri } from './services/apiClient';
 import {
   RequestData,
   ResponsePayload,
+  HttpMethod,
+  KeyValueItem,
+  RequestBody,
   FileTreeNode,
   EnvironmentData,
   HistoryItem,
@@ -315,18 +318,19 @@ export const App: React.FC = () => {
   };
 
   // 发送 HTTP 请求
-  const handleSendRequest = async () => {
-    if (isSending || !currentRequest) return;
+  const handleSendRequest = async (overrideReq?: RequestData) => {
+    const reqToSend = overrideReq || currentRequest;
+    if (isSending || !reqToSend) return;
     setIsSending(true);
     try {
-      const resp = await apiClient.executeHttpRequest(currentRequest, activeEnvironment);
+      const resp = await apiClient.executeHttpRequest(reqToSend, activeEnvironment);
 
       // 1. 运行测试断言
-      const testResults = evaluateAssertions(currentRequest.tests, resp);
+      const testResults = evaluateAssertions(reqToSend.tests, resp);
       resp.test_results = testResults;
 
       // 2. 运行环境变量自动提取
-      const extractedVars = extractVariables(currentRequest.extracts, resp);
+      const extractedVars = extractVariables(reqToSend.extracts, resp);
       resp.extracted_vars = extractedVars;
 
       // 3. 如果提取到变量且有激活环境，自动持久化更新环境变量
@@ -358,12 +362,12 @@ export const App: React.FC = () => {
       const newHistoryItem: HistoryItem = {
         id: `hist_${Date.now()}`,
         timestamp: Date.now(),
-        method: currentRequest.method,
-        url: currentRequest.url,
+        method: reqToSend.method,
+        url: reqToSend.url,
         status: resp.status,
         time_ms: resp.time_ms,
         size_bytes: resp.size_bytes,
-        request: JSON.parse(JSON.stringify(currentRequest)),
+        request: JSON.parse(JSON.stringify(reqToSend)),
         response: resp,
       };
 
@@ -377,16 +381,16 @@ export const App: React.FC = () => {
         id: `log_${Date.now()}`,
         timestamp: Date.now(),
         source: 'gui',
-        requestName: currentRequest.name,
-        method: currentRequest.method,
-        url: currentRequest.url,
+        requestName: reqToSend.name,
+        method: reqToSend.method,
+        url: reqToSend.url,
         status: resp.status,
         statusText: resp.status_text,
         timeMs: resp.time_ms,
         sizeBytes: resp.size_bytes,
         assertionsTotal: testResults.length,
         assertionsPassed: testResults.filter(t => t.passed).length,
-        request: JSON.parse(JSON.stringify(currentRequest)),
+        request: JSON.parse(JSON.stringify(reqToSend)),
         response: resp,
       };
 
@@ -411,16 +415,16 @@ export const App: React.FC = () => {
         id: `log_err_${Date.now()}`,
         timestamp: Date.now(),
         source: 'gui',
-        requestName: currentRequest.name,
-        method: currentRequest.method,
-        url: currentRequest.url,
+        requestName: reqToSend.name,
+        method: reqToSend.method,
+        url: reqToSend.url,
         status: 0,
         statusText: 'Error',
         timeMs: 0,
         sizeBytes: 0,
         assertionsTotal: 0,
         assertionsPassed: 0,
-        request: JSON.parse(JSON.stringify(currentRequest)),
+        request: JSON.parse(JSON.stringify(reqToSend)),
         response: errResp,
       };
       setExecutionLogs(prev => {
@@ -432,6 +436,182 @@ export const App: React.FC = () => {
       setIsSending(false);
     }
   };
+
+  // 接收来自外部 AI Skill (例如 tongyun-ui-bridge) 推送的接口数据
+  const handleAiPushRequest = (rawPayload: any) => {
+    if (!rawPayload || typeof rawPayload !== 'object') return;
+    const payload = rawPayload.payload || rawPayload;
+
+    // 格式化 Headers
+    let headers: KeyValueItem[] = [];
+    if (Array.isArray(payload.headers)) {
+      headers = payload.headers.map((h: any) => ({
+        key: String(h.key || ''),
+        value: String(h.value || ''),
+        enabled: h.enabled !== false,
+        description: h.description,
+      }));
+    } else if (payload.headers && typeof payload.headers === 'object') {
+      headers = Object.entries(payload.headers).map(([k, v]) => ({
+        key: k,
+        value: String(v),
+        enabled: true,
+      }));
+    } else {
+      headers = [{ key: 'Content-Type', value: 'application/json', enabled: true }];
+    }
+
+    // 格式化 Query Params
+    let params: KeyValueItem[] = [];
+    if (Array.isArray(payload.params)) {
+      params = payload.params.map((p: any) => ({
+        key: String(p.key || ''),
+        value: String(p.value || ''),
+        enabled: p.enabled !== false,
+        description: p.description,
+      }));
+    } else if (payload.params && typeof payload.params === 'object') {
+      params = Object.entries(payload.params).map(([k, v]) => ({
+        key: k,
+        value: String(v),
+        enabled: true,
+      }));
+    }
+
+    // 格式化 Body
+    let bodyContent = '';
+    let bodyType: RequestBody['body_type'] = 'none';
+    if (payload.body !== undefined && payload.body !== null) {
+      if (typeof payload.body === 'object') {
+        bodyContent = JSON.stringify(payload.body, null, 2);
+        bodyType = 'json';
+      } else {
+        bodyContent = String(payload.body);
+        const trimmed = bodyContent.trim();
+        bodyType = trimmed.startsWith('{') || trimmed.startsWith('[') ? 'json' : 'raw';
+      }
+    }
+
+    // 格式化 Method
+    const methodStr = String(payload.method || 'GET').toUpperCase();
+    const method: HttpMethod = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'].includes(methodStr)
+      ? (methodStr as HttpMethod)
+      : 'GET';
+
+    // 格式化断言
+    const tests = Array.isArray(payload.tests) ? payload.tests : [
+      {
+        id: `test_${Date.now()}_1`,
+        name: '状态码为 200',
+        type: 'status_equals' as const,
+        expected: '200',
+        enabled: true,
+      },
+    ];
+
+    const newReq: RequestData = {
+      id: `req_ai_${Date.now()}`,
+      name: payload.name || `AI: ${method} ${payload.url || '新请求'}`,
+      method,
+      url: payload.url || 'https://httpbin.org/get',
+      headers,
+      params,
+      body: {
+        body_type: bodyType,
+        content: bodyContent,
+      },
+      auth: payload.auth || { auth_type: 'none' },
+      tests,
+      extracts: Array.isArray(payload.extracts) ? payload.extracts : [],
+      description: payload.description || '外部 AI Skill 推送到 UI',
+    };
+
+    const newTab: TabItem = {
+      id: `tab_ai_${Date.now()}`,
+      request: newReq,
+      isDirty: false,
+    };
+
+    setTabs(prev => [...prev, newTab]);
+    setActiveTabId(newTab.id);
+    setResponse(null);
+    showToast(`🤖 AI Skill 已将接口推入 UI: ${newReq.name}`);
+
+    if (payload.autoSend) {
+      setTimeout(() => {
+        handleSendRequest(newReq);
+      }, 100);
+    }
+  };
+
+  // 监听来自桌面 Rust Bridge (端口 4171) 以及 BroadcastChannel 的 AI 事件
+  useEffect(() => {
+    let unlistenPush: (() => void) | undefined;
+    let unlistenSend: (() => void) | undefined;
+
+    if (isTauri()) {
+      import('@tauri-apps/api/event').then(({ listen }) => {
+        listen<any>('ai-bridge-push', (event) => {
+          handleAiPushRequest(event.payload);
+        }).then(unlisten => {
+          unlistenPush = unlisten;
+        }).catch(err => {
+          console.warn('Tauri event listen error (push):', err);
+        });
+
+        listen<any>('ai-bridge-send', (event) => {
+          if (event.payload && (event.payload.url || event.payload.name)) {
+            handleAiPushRequest({ ...event.payload, autoSend: true });
+          } else {
+            handleSendRequest();
+          }
+        }).then(unlisten => {
+          unlistenSend = unlisten;
+        }).catch(err => {
+          console.warn('Tauri event listen error (send):', err);
+        });
+      }).catch(err => {
+        console.warn('Tauri event module import failed:', err);
+      });
+    }
+
+    const channel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('tongyun_ai_bridge') : null;
+    if (channel) {
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'push') {
+          handleAiPushRequest(event.data.payload);
+        } else if (event.data?.type === 'send') {
+          if (event.data.payload?.url) {
+            handleAiPushRequest({ ...event.data.payload, autoSend: true });
+          } else {
+            handleSendRequest();
+          }
+        }
+      };
+    }
+
+    const handleWindowMessage = (e: MessageEvent) => {
+      if (e.data?.source === 'tongyun-ai-bridge') {
+        if (e.data.type === 'push') {
+          handleAiPushRequest(e.data.payload);
+        } else if (e.data.type === 'send') {
+          if (e.data.payload?.url) {
+            handleAiPushRequest({ ...e.data.payload, autoSend: true });
+          } else {
+            handleSendRequest();
+          }
+        }
+      }
+    };
+    window.addEventListener('message', handleWindowMessage);
+
+    return () => {
+      if (unlistenPush) unlistenPush();
+      if (unlistenSend) unlistenSend();
+      if (channel) channel.close();
+      window.removeEventListener('message', handleWindowMessage);
+    };
+  }, []);
 
   // 执行指定文件的请求（供批量跑批使用）
   const handleExecuteRequestFile = async (filePath: string, env: EnvironmentData | null) => {

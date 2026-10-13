@@ -9,7 +9,9 @@ import {
   RefreshCw,
   Code2,
   CheckSquare,
-  Variable
+  Variable,
+  Sparkles,
+  Bot
 } from 'lucide-react';
 import {
   RequestData,
@@ -49,6 +51,148 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
   const [activeTab, setActiveTab] = useState<'params' | 'headers' | 'auth' | 'body' | 'tests' | 'docs'>('params');
   const [copiedCurl, setCopiedCurl] = useState(false);
   const [jsonError, setJsonError] = useState<string | null>(null);
+  const [aiPromptInput, setAiPromptInput] = useState('');
+
+  // 常见接口一键模板
+  const AI_TEMPLATES = [
+    {
+      label: '🔑 用户登录鉴权',
+      data: {
+        name: '用户登录鉴权',
+        method: 'POST' as HttpMethod,
+        url: 'https://httpbin.org/post',
+        headers: [{ key: 'Content-Type', value: 'application/json', enabled: true }],
+        params: [],
+        body: {
+          body_type: 'json' as BodyType,
+          content: JSON.stringify({ username: 'admin', password: 'password123', client: 'web' }, null, 2),
+        },
+        auth: { auth_type: 'none' as const },
+        tests: [
+          { id: 't1', name: '状态码为 200', type: 'status_equals' as const, expected: '200', enabled: true },
+          { id: 't2', name: '响应耗时 <= 1000ms', type: 'time_less_than' as const, expected: '1000', enabled: true },
+        ],
+        extracts: [
+          { id: 'e1', var_name: 'token', source: 'json' as const, path_or_key: 'json.client', enabled: true },
+        ],
+      },
+    },
+    {
+      label: '📦 创建业务订单',
+      data: {
+        name: '创建业务订单',
+        method: 'POST' as HttpMethod,
+        url: 'https://httpbin.org/post',
+        headers: [
+          { key: 'Content-Type', value: 'application/json', enabled: true },
+          { key: 'Authorization', value: 'Bearer {{token}}', enabled: true },
+        ],
+        params: [],
+        body: {
+          body_type: 'json' as BodyType,
+          content: JSON.stringify(
+            {
+              orderNo: '{{$uuid}}',
+              amount: 199.9,
+              currency: 'CNY',
+              items: [{ productId: 'P1001', quantity: 2, price: 99.95 }],
+            },
+            null,
+            2
+          ),
+        },
+        auth: { auth_type: 'bearer' as const, token: '{{token}}' },
+        tests: [
+          { id: 't1', name: '状态码为 200', type: 'status_equals' as const, expected: '200', enabled: true },
+        ],
+      },
+    },
+    {
+      label: '🔍 分页查询列表',
+      data: {
+        name: '分页查询列表',
+        method: 'GET' as HttpMethod,
+        url: 'https://httpbin.org/get',
+        headers: [{ key: 'Accept', value: 'application/json', enabled: true }],
+        params: [
+          { key: 'page', value: '1', enabled: true, description: '当前页码' },
+          { key: 'pageSize', value: '20', enabled: true, description: '每页条数' },
+          { key: 'keyword', value: 'tongyun', enabled: true, description: '检索词' },
+        ],
+        body: { body_type: 'none' as BodyType, content: '' },
+        auth: { auth_type: 'none' as const },
+        tests: [
+          { id: 't1', name: '状态码为 200', type: 'status_equals' as const, expected: '200', enabled: true },
+        ],
+      },
+    },
+    {
+      label: '❤️ 健康检查探测',
+      data: {
+        name: '健康检查探测',
+        method: 'GET' as HttpMethod,
+        url: 'https://httpbin.org/status/200',
+        headers: [],
+        params: [],
+        body: { body_type: 'none' as BodyType, content: '' },
+        auth: { auth_type: 'none' as const },
+        tests: [
+          { id: 't1', name: '健康状态码 200', type: 'status_equals' as const, expected: '200', enabled: true },
+          { id: 't2', name: '延迟 <= 500ms', type: 'time_less_than' as const, expected: '500', enabled: true },
+        ],
+      },
+    },
+  ];
+
+  const handleApplyAiTemplate = (tpl: any) => {
+    onChange({
+      ...request,
+      ...tpl.data,
+      id: request.id,
+      name: tpl.data.name,
+    });
+    if (onToast) onToast(`✨ AI 已自动填入接口结构: ${tpl.data.name}`);
+  };
+
+  const handleAiPromptGenerate = () => {
+    const p = aiPromptInput.trim();
+    if (!p) return;
+
+    let inferredMethod: HttpMethod = 'GET';
+    if (p.includes('创建') || p.includes('添加') || p.includes('登录') || p.includes('提交') || p.toLowerCase().includes('post')) {
+      inferredMethod = 'POST';
+    } else if (p.includes('修改') || p.includes('更新') || p.toLowerCase().includes('put')) {
+      inferredMethod = 'PUT';
+    } else if (p.includes('删除') || p.toLowerCase().includes('delete')) {
+      inferredMethod = 'DELETE';
+    }
+
+    const newReq: RequestData = {
+      ...request,
+      name: p,
+      method: inferredMethod,
+      url: inferredMethod === 'GET' ? 'https://httpbin.org/get' : 'https://httpbin.org/post',
+      headers:
+        inferredMethod !== 'GET'
+          ? [{ key: 'Content-Type', value: 'application/json', enabled: true }]
+          : [{ key: 'Accept', value: 'application/json', enabled: true }],
+      params: inferredMethod === 'GET' ? [{ key: 'keyword', value: p, enabled: true }] : [],
+      body:
+        inferredMethod !== 'GET'
+          ? {
+              body_type: 'json',
+              content: JSON.stringify({ title: p, timestamp: '{{$timestamp}}' }, null, 2),
+            }
+          : { body_type: 'none', content: '' },
+      tests: [
+        { id: `test_${Date.now()}`, name: '状态码为 200', type: 'status_equals', expected: '200', enabled: true },
+      ],
+    };
+
+    onChange(newReq);
+    setAiPromptInput('');
+    if (onToast) onToast(`✨ AI 已根据需求 "${p}" 自动生成并填入所有接口字段`);
+  };
 
   // 格式化 JSON
   const handlePrettifyJson = () => {
@@ -185,6 +329,49 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-slate-900 overflow-hidden border-b border-slate-800">
+      {/* AI Copilot Quick Fill Bar */}
+      <div className="bg-gradient-to-r from-sky-950/40 via-indigo-950/30 to-purple-950/40 border-b border-sky-900/40 px-3 py-2 text-xs flex flex-wrap items-center justify-between gap-2 shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 text-sky-300 font-semibold text-[11px]">
+            <Sparkles className="w-3.5 h-3.5 text-sky-400 animate-pulse" />
+            <span>AI 自动填入</span>
+          </div>
+          <span className="text-slate-600">|</span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {AI_TEMPLATES.map((tpl, idx) => (
+              <button
+                key={idx}
+                onClick={() => handleApplyAiTemplate(tpl)}
+                className="px-2 py-0.5 rounded bg-slate-900/80 hover:bg-sky-500/20 text-slate-300 hover:text-sky-200 border border-slate-700/60 hover:border-sky-500/40 text-[11px] transition-colors"
+                title={`一键将 ${tpl.label} 的完整参数与用例填入当前界面`}
+              >
+                {tpl.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Prompt Input */}
+        <div className="flex items-center gap-1.5">
+          <input
+            type="text"
+            value={aiPromptInput}
+            onChange={e => setAiPromptInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAiPromptGenerate()}
+            placeholder="告诉 AI 要测什么接口 (如: 微信退款、发送验证码)..."
+            className="bg-slate-950/90 border border-slate-700/80 rounded px-2.5 py-1 text-[11px] text-slate-200 placeholder-slate-500 outline-none focus:border-sky-500 w-64"
+          />
+          <button
+            onClick={handleAiPromptGenerate}
+            disabled={!aiPromptInput.trim()}
+            className="flex items-center gap-1 px-2.5 py-1 rounded bg-sky-500 hover:bg-sky-400 text-white font-medium text-[11px] transition-colors disabled:opacity-40"
+          >
+            <Bot className="w-3 h-3" />
+            <span>AI 帮我填</span>
+          </button>
+        </div>
+      </div>
+
       {/* URL Input Bar */}
       <div className="p-3 border-b border-slate-800 flex items-center gap-2 bg-slate-950/30">
         {/* Method selector */}

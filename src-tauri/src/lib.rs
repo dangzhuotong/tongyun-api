@@ -809,6 +809,7 @@ fn open_in_explorer(path: String) -> Result<(), String> {
 
 mod scan;
 mod send;
+mod bridge_server;
 
 #[tauri::command]
 fn scan_workspace(root: String) -> Result<scan::ScannedWorkspace, String> {
@@ -833,6 +834,11 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .setup(|app| {
+            let handle = app.handle().clone();
+            bridge_server::start_bridge_server(handle, 4171);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             get_workspace_path,
             execute_http_request,
