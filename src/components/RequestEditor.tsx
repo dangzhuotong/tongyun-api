@@ -6,13 +6,19 @@ import {
   Plus,
   Trash2,
   Wand2,
-  RefreshCw
+  RefreshCw,
+  Code2,
+  CheckSquare,
+  Variable
 } from 'lucide-react';
 import {
   RequestData,
   HttpMethod,
   BodyType,
-  EnvironmentData
+  EnvironmentData,
+  RequestAssertion,
+  VariableExtraction,
+  AssertionType
 } from '../types/api';
 import { exportToCurl } from '../utils/curl';
 import { getMethodBadgeColor } from './Sidebar';
@@ -23,6 +29,7 @@ interface RequestEditorProps {
   onChange: (updated: RequestData) => void;
   onSend: () => void;
   isSending: boolean;
+  onOpenCodeSnippet?: () => void;
 }
 
 export const RequestEditor: React.FC<RequestEditorProps> = ({
@@ -31,8 +38,9 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
   onChange,
   onSend,
   isSending,
+  onOpenCodeSnippet,
 }) => {
-  const [activeTab, setActiveTab] = useState<'params' | 'headers' | 'auth' | 'body' | 'docs'>('params');
+  const [activeTab, setActiveTab] = useState<'params' | 'headers' | 'auth' | 'body' | 'tests' | 'docs'>('params');
   const [copiedCurl, setCopiedCurl] = useState(false);
   const [jsonError, setJsonError] = useState<string | null>(null);
 
@@ -116,8 +124,58 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
     updateField('headers', updated);
   };
 
+  // 断言操作
+  const handleAddAssertion = (preset?: Partial<RequestAssertion>) => {
+    const currentTests = request.tests || [];
+    const newAssertion: RequestAssertion = {
+      id: `test_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name: preset?.name || '响应状态码校验',
+      type: preset?.type || 'status_equals',
+      target: preset?.target || '',
+      expected: preset?.expected || '200',
+      enabled: true,
+    };
+    updateField('tests', [...currentTests, newAssertion]);
+  };
+
+  const handleUpdateAssertion = (index: number, updated: RequestAssertion) => {
+    const currentTests = [...(request.tests || [])];
+    currentTests[index] = updated;
+    updateField('tests', currentTests);
+  };
+
+  const handleDeleteAssertion = (index: number) => {
+    const currentTests = (request.tests || []).filter((_, i) => i !== index);
+    updateField('tests', currentTests);
+  };
+
+  // 变量提取操作
+  const handleAddExtraction = (preset?: Partial<VariableExtraction>) => {
+    const currentExtracts = request.extracts || [];
+    const newExtraction: VariableExtraction = {
+      id: `ext_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      var_name: preset?.var_name || 'token',
+      source: preset?.source || 'json',
+      path_or_key: preset?.path_or_key || 'token',
+      enabled: true,
+    };
+    updateField('extracts', [...currentExtracts, newExtraction]);
+  };
+
+  const handleUpdateExtraction = (index: number, updated: VariableExtraction) => {
+    const currentExtracts = [...(request.extracts || [])];
+    currentExtracts[index] = updated;
+    updateField('extracts', currentExtracts);
+  };
+
+  const handleDeleteExtraction = (index: number) => {
+    const currentExtracts = (request.extracts || []).filter((_, i) => i !== index);
+    updateField('extracts', currentExtracts);
+  };
+
   const activeParamsCount = request.params.filter(p => p.enabled && p.key.trim()).length;
   const activeHeadersCount = request.headers.filter(h => h.enabled && h.key.trim()).length;
+  const activeTestsCount = (request.tests?.filter(t => t.enabled).length || 0) + (request.extracts?.filter(e => e.enabled).length || 0);
 
   return (
     <div className="flex flex-col h-full bg-slate-900 overflow-hidden border-b border-slate-800">
@@ -174,6 +232,18 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
             </>
           )}
         </button>
+
+        {/* Code Generator Modal Trigger */}
+        {onOpenCodeSnippet && (
+          <button
+            onClick={onOpenCodeSnippet}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 transition-colors"
+            title="生成多语言客户端调用代码 (JS/Python/Go/Rust等)"
+          >
+            <Code2 className="w-3.5 h-3.5 text-sky-400" />
+            <span>代码</span>
+          </button>
+        )}
 
         {/* Send Button */}
         <button
@@ -253,6 +323,22 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
           {request.body.body_type !== 'none' && (
             <span className="px-1.5 py-0.2 rounded text-[10px] bg-amber-500/20 text-amber-300 font-mono uppercase">
               {request.body.body_type}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('tests')}
+          className={`py-2.5 font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
+            activeTab === 'tests'
+              ? 'text-sky-400 border-sky-400'
+              : 'text-slate-400 border-transparent hover:text-slate-200'
+          }`}
+        >
+          <span>断言与测试</span>
+          {activeTestsCount > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 font-mono">
+              {activeTestsCount}
             </span>
           )}
         </button>
@@ -657,6 +743,256 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
                 />
               </div>
             )}
+          </div>
+        )}
+
+        {/* TESTS & EXTRACTION TAB */}
+        {activeTab === 'tests' && (
+          <div className="space-y-6 text-xs max-w-4xl">
+            {/* 1. Assertions */}
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                <div>
+                  <h4 className="font-semibold text-slate-200 flex items-center gap-1.5">
+                    <CheckSquare className="w-4 h-4 text-emerald-400" />
+                    <span>请求断言规则 (Assertions)</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    发送请求后自动运行断言，在下方“响应”面板展示测试通过与失败详情
+                  </p>
+                </div>
+
+                {/* Preset shortcuts */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] text-slate-500 mr-1">快捷添加:</span>
+                  <button
+                    onClick={() => handleAddAssertion({ name: '状态码为 200', type: 'status_equals', expected: '200' })}
+                    className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-sky-400 text-[11px] border border-slate-700/80 transition-colors"
+                  >
+                    + 状态码 200
+                  </button>
+                  <button
+                    onClick={() => handleAddAssertion({ name: '响应耗时在 1s 内', type: 'time_less_than', expected: '1000' })}
+                    className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-sky-400 text-[11px] border border-slate-700/80 transition-colors"
+                  >
+                    + 耗时 &lt; 1000ms
+                  </button>
+                  <button
+                    onClick={() => handleAddAssertion({ name: '包含成功标记', type: 'body_contains', expected: 'success' })}
+                    className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-sky-400 text-[11px] border border-slate-700/80 transition-colors"
+                  >
+                    + 包含关键字
+                  </button>
+                  <button
+                    onClick={() => handleAddAssertion({ name: 'code 字段校验', type: 'json_path_equals', target: 'code', expected: '0' })}
+                    className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-sky-400 text-[11px] border border-slate-700/80 transition-colors"
+                  >
+                    + JSON 字段
+                  </button>
+                  <button
+                    onClick={() => handleAddAssertion()}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-[11px] transition-colors ml-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>添加断言</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Assertion Table */}
+              <div className="border border-slate-800 rounded-md overflow-hidden bg-slate-950/40">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-900/80 text-slate-400 border-b border-slate-800">
+                    <tr>
+                      <th className="w-10 px-3 py-2 text-center">启用</th>
+                      <th className="px-3 py-2 w-1/4">断言说明名称</th>
+                      <th className="px-3 py-2 w-1/4">校验类型</th>
+                      <th className="px-3 py-2 w-1/5">目标路径 / 标头</th>
+                      <th className="px-3 py-2 w-1/5">期望值 (Expected)</th>
+                      <th className="w-10 px-2 py-2 text-center">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {(!request.tests || request.tests.length === 0) ? (
+                      <tr>
+                        <td colSpan={6} className="text-center py-6 text-slate-500">
+                          暂无断言规则，点击上方快捷按钮添加（例如验证状态码 200 或耗时小于 1000ms）
+                        </td>
+                      </tr>
+                    ) : (
+                      request.tests.map((test, idx) => (
+                        <tr key={test.id || idx} className="hover:bg-slate-800/30">
+                          <td className="px-3 py-1.5 text-center">
+                            <input
+                              type="checkbox"
+                              checked={test.enabled}
+                              onChange={e => handleUpdateAssertion(idx, { ...test, enabled: e.target.checked })}
+                              className="rounded accent-emerald-500 cursor-pointer"
+                            />
+                          </td>
+                          <td className="px-2 py-1">
+                            <input
+                              type="text"
+                              value={test.name}
+                              onChange={e => handleUpdateAssertion(idx, { ...test, name: e.target.value })}
+                              placeholder="例如: 状态码 200"
+                              className="w-full bg-transparent border-0 text-slate-200 text-xs focus:outline-none"
+                            />
+                          </td>
+                          <td className="px-2 py-1">
+                            <select
+                              value={test.type}
+                              onChange={e => handleUpdateAssertion(idx, { ...test, type: e.target.value as AssertionType })}
+                              className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs outline-none"
+                            >
+                              <option value="status_equals">状态码等于 (==)</option>
+                              <option value="status_in_range">状态码区间 (如 200-299)</option>
+                              <option value="time_less_than">响应耗时小于 (ms)</option>
+                              <option value="body_contains">响应体包含文本</option>
+                              <option value="json_path_equals">JSON 字段值匹配</option>
+                              <option value="header_exists">包含 Header 标头</option>
+                            </select>
+                          </td>
+                          <td className="px-2 py-1">
+                            <input
+                              type="text"
+                              value={test.target || ''}
+                              onChange={e => handleUpdateAssertion(idx, { ...test, target: e.target.value })}
+                              placeholder={
+                                test.type === 'json_path_equals'
+                                  ? '如 data.code'
+                                  : test.type === 'header_exists'
+                                  ? '如 content-type'
+                                  : '不需填写'
+                              }
+                              disabled={test.type !== 'json_path_equals' && test.type !== 'header_exists'}
+                              className="w-full bg-transparent border-0 text-slate-200 font-mono text-xs focus:outline-none disabled:opacity-30"
+                            />
+                          </td>
+                          <td className="px-2 py-1">
+                            <input
+                              type="text"
+                              value={test.expected}
+                              onChange={e => handleUpdateAssertion(idx, { ...test, expected: e.target.value })}
+                              placeholder="期望匹配值"
+                              className="w-full bg-transparent border-0 text-slate-200 font-mono text-xs focus:outline-none"
+                            />
+                          </td>
+                          <td className="px-2 py-1 text-center">
+                            <button
+                              onClick={() => handleDeleteAssertion(idx)}
+                              className="text-slate-500 hover:text-rose-400 p-1"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 2. Variable Extractions */}
+            <div className="space-y-3 pt-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                <div>
+                  <h4 className="font-semibold text-slate-200 flex items-center gap-1.5">
+                    <Variable className="w-4 h-4 text-sky-400" />
+                    <span>环境变量自动提取 (Auto Variable Extraction)</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    请求成功后，自动从返回内容中提取字段并写入当前环境，下游接口可直接通过 <code className="text-emerald-300 font-mono">{"{{变量名}}"}</code> 调用
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => handleAddExtraction()}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white font-medium text-[11px] transition-colors"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>添加提取规则</span>
+                </button>
+              </div>
+
+              {/* Extraction Table */}
+              <div className="border border-slate-800 rounded-md overflow-hidden bg-slate-950/40">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-900/80 text-slate-400 border-b border-slate-800">
+                    <tr>
+                      <th className="w-10 px-3 py-2 text-center">启用</th>
+                      <th className="px-3 py-2 w-1/3">写入目标变量名 (将成为 {"{{变量}}"})</th>
+                      <th className="px-3 py-2 w-1/4">提取来源</th>
+                      <th className="px-3 py-2 w-1/3">提取字段路径 (JSON 路径 / Header 名)</th>
+                      <th className="w-10 px-2 py-2 text-center">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {(!request.extracts || request.extracts.length === 0) ? (
+                      <tr>
+                        <td colSpan={5} className="text-center py-6 text-slate-500">
+                          暂无提取规则，例如在登录接口配置提取 data.token 写入 {"{{token}}"}
+                        </td>
+                      </tr>
+                    ) : (
+                      request.extracts.map((ext, idx) => (
+                        <tr key={ext.id || idx} className="hover:bg-slate-800/30">
+                          <td className="px-3 py-1.5 text-center">
+                            <input
+                              type="checkbox"
+                              checked={ext.enabled}
+                              onChange={e => handleUpdateExtraction(idx, { ...ext, enabled: e.target.checked })}
+                              className="rounded accent-sky-500 cursor-pointer"
+                            />
+                          </td>
+                          <td className="px-2 py-1">
+                            <div className="flex items-center gap-1">
+                              <span className="text-slate-500 font-mono">{"{{"}</span>
+                              <input
+                                type="text"
+                                value={ext.var_name}
+                                onChange={e => handleUpdateExtraction(idx, { ...ext, var_name: e.target.value })}
+                                placeholder="如 token, userId"
+                                className="w-full bg-transparent border-0 text-emerald-400 font-mono text-xs focus:outline-none"
+                              />
+                              <span className="text-slate-500 font-mono">{"}}"}</span>
+                            </div>
+                          </td>
+                          <td className="px-2 py-1">
+                            <select
+                              value={ext.source}
+                              onChange={e => handleUpdateExtraction(idx, { ...ext, source: e.target.value as 'json' | 'header' })}
+                              className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs outline-none"
+                            >
+                              <option value="json">JSON 响应体路径</option>
+                              <option value="header">响应 Header 标头</option>
+                            </select>
+                          </td>
+                          <td className="px-2 py-1">
+                            <input
+                              type="text"
+                              value={ext.path_or_key}
+                              onChange={e => handleUpdateExtraction(idx, { ...ext, path_or_key: e.target.value })}
+                              placeholder={ext.source === 'json' ? '如 data.token 或 items.0.id' : '如 Authorization'}
+                              className="w-full bg-transparent border-0 text-slate-200 font-mono text-xs focus:outline-none"
+                            />
+                          </td>
+                          <td className="px-2 py-1 text-center">
+                            <button
+                              onClick={() => handleDeleteExtraction(idx)}
+                              className="text-slate-500 hover:text-rose-400 p-1"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
 

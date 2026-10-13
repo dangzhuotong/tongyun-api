@@ -8,7 +8,11 @@ import {
   Zap,
   Download,
   Search,
-  X
+  X,
+  CheckCircle2,
+  XCircle,
+  Variable,
+  CheckSquare
 } from 'lucide-react';
 import { ResponsePayload } from '../types/api';
 
@@ -18,7 +22,7 @@ interface ResponseViewerProps {
 }
 
 export const ResponseViewer: React.FC<ResponseViewerProps> = ({ response, isSending }) => {
-  const [activeTab, setActiveTab] = useState<'body' | 'headers' | 'preview'>('body');
+  const [activeTab, setActiveTab] = useState<'body' | 'headers' | 'tests' | 'preview'>('body');
   const [viewMode, setViewMode] = useState<'pretty' | 'raw'>('pretty');
   const [copied, setCopied] = useState(false);
   const [copiedHeaders, setCopiedHeaders] = useState(false);
@@ -184,6 +188,34 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({ response, isSend
             <HardDrive className="w-3.5 h-3.5 text-slate-500" />
             <span>{formatSize(response.size_bytes)}</span>
           </div>
+
+          {/* Tests Badge if ran */}
+          {response.test_results && response.test_results.length > 0 && (
+            <div
+              className={`px-2 py-0.5 rounded border font-mono text-[11px] font-medium flex items-center gap-1 ${
+                response.test_results.every(t => t.passed)
+                  ? 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30'
+                  : 'text-rose-400 bg-rose-500/15 border-rose-500/30'
+              }`}
+            >
+              {response.test_results.every(t => t.passed) ? (
+                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+              ) : (
+                <XCircle className="w-3 h-3 text-rose-400" />
+              )}
+              <span>
+                断言: {response.test_results.filter(t => t.passed).length}/{response.test_results.length}
+              </span>
+            </div>
+          )}
+
+          {/* Extracted Vars Badge */}
+          {response.extracted_vars && response.extracted_vars.length > 0 && (
+            <div className="px-2 py-0.5 rounded border border-sky-500/30 bg-sky-500/15 text-sky-300 font-mono text-[11px] font-medium flex items-center gap-1">
+              <Zap className="w-3 h-3 text-sky-400" />
+              <span>提取 {response.extracted_vars.length} 变量</span>
+            </div>
+          )}
         </div>
 
         {/* Right actions: Copy & Modes & Download */}
@@ -265,6 +297,32 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({ response, isSend
             </span>
           </button>
           <button
+            onClick={() => setActiveTab('tests')}
+            className={`py-2 font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
+              activeTab === 'tests'
+                ? 'text-sky-400 border-sky-400'
+                : 'text-slate-400 border-transparent hover:text-slate-200'
+            }`}
+          >
+            <span>断言与提取结果</span>
+            {response.test_results && response.test_results.length > 0 && (
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                  response.test_results.every(t => t.passed)
+                    ? 'bg-emerald-500/20 text-emerald-300'
+                    : 'bg-rose-500/20 text-rose-300'
+                }`}
+              >
+                {response.test_results.filter(t => t.passed).length}/{response.test_results.length}
+              </span>
+            )}
+            {response.extracted_vars && response.extracted_vars.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded text-[10px] bg-sky-500/20 text-sky-300 font-mono">
+                {response.extracted_vars.length} 变量
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => setActiveTab('preview')}
             className={`py-2 font-medium border-b-2 transition-colors ${
               activeTab === 'preview'
@@ -337,6 +395,118 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({ response, isSend
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {activeTab === 'tests' && (
+          <div className="space-y-4 max-w-3xl font-sans">
+            {/* Assertions list */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-slate-300 flex items-center gap-1.5">
+                  <CheckSquare className="w-4 h-4 text-emerald-400" />
+                  <span>断言测试运行结果</span>
+                </span>
+                {response.test_results && response.test_results.length > 0 && (
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    共运行 {response.test_results.length} 项断言 · 通过率{' '}
+                    {Math.round(
+                      (response.test_results.filter(t => t.passed).length / response.test_results.length) * 100
+                    )}
+                    %
+                  </span>
+                )}
+              </div>
+
+              {(!response.test_results || response.test_results.length === 0) ? (
+                <div className="p-6 bg-slate-900/60 rounded-lg border border-slate-800 text-center text-slate-500">
+                  <CheckCircle2 className="w-8 h-8 mx-auto text-slate-600 mb-2 opacity-50" />
+                  <p>当前请求未配置断言规则</p>
+                  <p className="text-[11px] text-slate-600 mt-1">
+                    在上方请求编辑器的“断言与测试”选项卡中添加状态码、耗时或 JSON 校验即可自动检测
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {response.test_results.map((tr, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-3 rounded-lg border flex items-start justify-between gap-3 ${
+                        tr.passed
+                          ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200'
+                          : 'bg-rose-950/20 border-rose-500/30 text-rose-200'
+                      }`}
+                    >
+                      <div className="flex items-start gap-2.5">
+                        {tr.passed ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
+                        )}
+                        <div>
+                          <div className="font-semibold text-xs text-slate-200">
+                            {tr.assertion.name || tr.assertion.type}
+                          </div>
+                          <div className={`text-[11px] mt-0.5 ${tr.passed ? 'text-emerald-300' : 'text-rose-300'}`}>
+                            {tr.message}
+                          </div>
+                          {tr.actual && !tr.passed && (
+                            <div className="text-[10px] text-slate-400 font-mono mt-1 bg-slate-900/80 p-1.5 rounded">
+                              实际值: {tr.actual} | 期望值: {tr.assertion.expected}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <span
+                        className={`text-[10px] uppercase font-mono px-2 py-0.5 rounded font-bold ${
+                          tr.passed
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                        }`}
+                      >
+                        {tr.passed ? 'PASSED' : 'FAILED'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Extracted Variables list */}
+            <div className="space-y-2 pt-2 border-t border-slate-800">
+              <span className="font-semibold text-xs text-slate-300 flex items-center gap-1.5">
+                <Variable className="w-4 h-4 text-sky-400" />
+                <span>已自动提取并同步的环境变量</span>
+              </span>
+
+              {(!response.extracted_vars || response.extracted_vars.length === 0) ? (
+                <div className="p-4 bg-slate-900/40 rounded-lg border border-slate-800/80 text-center text-slate-500 text-[11px]">
+                  未从本次响应中提取环境变量（可在请求编辑器配置“环境变量自动提取”）
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {response.extracted_vars.map((ev, idx) => (
+                    <div
+                      key={idx}
+                      className="p-2.5 rounded-lg bg-sky-950/20 border border-sky-500/30 flex items-center justify-between text-xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                          {`{{${ev.key}}}`}
+                        </span>
+                        <span className="text-slate-400">=</span>
+                        <span className="font-mono text-slate-200 select-all truncate max-w-xs">{ev.value}</span>
+                        <span className="text-[10px] text-slate-500 font-mono">({ev.source})</span>
+                      </div>
+                      <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                        ✓ 已持久化写入当前环境
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

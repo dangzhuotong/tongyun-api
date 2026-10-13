@@ -6,7 +6,9 @@ import { RequestEditor } from './components/RequestEditor';
 import { ResponseViewer } from './components/ResponseViewer';
 import { EnvironmentModal } from './components/EnvironmentModal';
 import { ImportModal } from './components/ImportModal';
-import { apiClient } from './services/apiClient';
+import { CodeSnippetModal } from './components/CodeSnippetModal';
+import { GitStatusModal } from './components/GitStatusModal';
+import { apiClient, GitStatusResult } from './services/apiClient';
 import {
   RequestData,
   ResponsePayload,
@@ -15,6 +17,7 @@ import {
   HistoryItem
 } from './types/api';
 import { ImportedCollectionResult } from './utils/importers';
+import { evaluateAssertions, extractVariables } from './utils/tester';
 
 const createDefaultRequest = (): RequestData => ({
   id: `req_${Date.now()}`,
@@ -25,6 +28,16 @@ const createDefaultRequest = (): RequestData => ({
   params: [],
   body: { body_type: 'none', content: '' },
   auth: { auth_type: 'none' },
+  tests: [
+    {
+      id: 'test_default_status',
+      name: '状态码为 200',
+      type: 'status_equals',
+      expected: '200',
+      enabled: true,
+    },
+  ],
+  extracts: [],
   description: '自用 API 调试',
 });
 
@@ -49,6 +62,9 @@ export const App: React.FC = () => {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isEnvModalOpen, setIsEnvModalOpen] = useState<boolean>(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
+  const [isCodeModalOpen, setIsCodeModalOpen] = useState<boolean>(false);
+  const [isGitModalOpen, setIsGitModalOpen] = useState<boolean>(false);
+  const [gitStatus, setGitStatus] = useState<GitStatusResult | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -70,6 +86,19 @@ export const App: React.FC = () => {
     return environments.find(e => e.id === selectedEnvId) || null;
   }, [environments, selectedEnvId]);
 
+  // 刷新 Git 状态
+  const refreshGitStatus = useCallback(async (ws?: string) => {
+    try {
+      const path = ws || workspacePath;
+      if (path) {
+        const status = await apiClient.getGitStatus(path);
+        setGitStatus(status);
+      }
+    } catch (e) {
+      console.error('获取 Git 状态异常:', e);
+    }
+  }, [workspacePath]);
+
   // 加载工作区与初始化
   const loadWorkspace = useCallback(async () => {
     try {
@@ -84,6 +113,8 @@ export const App: React.FC = () => {
       if (envs.length > 0 && !selectedEnvId) {
         setSelectedEnvId(envs[0].id);
       }
+
+      await refreshGitStatus(ws);
 
       // 默认将树中第一个文件作为第一个标签页打开
       const findFirstFile = (nodes: FileTreeNode[]): string | null => {
@@ -114,7 +145,7 @@ export const App: React.FC = () => {
       console.error('加载工作区失败:', e);
       showToast(`加载工作区失败: ${e.message}`);
     }
-  }, [selectedEnvId]);
+  }, [selectedEnvId, refreshGitStatus]);
 
   useEffect(() => {
     loadWorkspace();
@@ -217,6 +248,7 @@ export const App: React.FC = () => {
         );
         const tree = await apiClient.loadFileTree();
         setFileTree(tree);
+        await refreshGitStatus();
         showToast('已保存为本地纯文本文件');
       } catch (e: any) {
         showToast(`保存失败: ${e.message}`);
@@ -231,9 +263,39 @@ export const App: React.FC = () => {
       );
       const tree = await apiClient.loadFileTree();
       setFileTree(tree);
+      await refreshGitStatus();
       showToast('已保存');
     } catch (e: any) {
       showToast(`保存失败: ${e.message}`);
+    }
+  };
+
+  // 保存环境变量
+  const handleSaveEnvironment = async (env: EnvironmentData) => {
+    try {
+      await apiClient.saveEnvironment(workspacePath, env);
+      const envs = await apiClient.loadEnvironments(workspacePath);
+      setEnvironments(envs);
+      await refreshGitStatus();
+      showToast(`已保存环境变量 ${env.name}`);
+    } catch (e: any) {
+      showToast(`保存环境变量失败: ${e.message}`);
+    }
+  };
+
+  // 删除环境变量
+  const handleDeleteEnvironment = async (envId: string) => {
+    try {
+      await apiClient.deleteEnvironment(workspacePath, envId);
+      const envs = await apiClient.loadEnvironments(workspacePath);
+      setEnvironments(envs);
+      if (selectedEnvId === envId) {
+        setSelectedEnvId(envs[0]?.id || '');
+      }
+      await refreshGitStatus();
+      showToast('已删除环境变量');
+    } catch (e: any) {
+      showToast(`删除环境失败: ${e.message}`);
     }
   };
 
@@ -243,6 +305,39 @@ export const App: React.FC = () => {
     setIsSending(true);
     try {
       const resp = await apiClient.executeHttpRequest(currentRequest, activeEnvironment);
+
+      // 1. 运行测试断言
+      const testResults = evaluateAssertions(currentRequest.tests, resp);
+      resp.test_results = testResults;
+
+      // 2. 运行环境变量自动提取
+      const extractedVars = extractVariables(currentRequest.extracts, resp);
+      resp.extracted_vars = extractedVars;
+
+      // 3. 如果提取到变量且有激活环境，自动持久化更新环境变量
+      if (extractedVars.length > 0 && activeEnvironment) {
+        const updatedVars = [...activeEnvironment.variables];
+        let hasNew = false;
+        for (const ev of extractedVars) {
+          const existingIdx = updatedVars.findIndex(v => v.key === ev.key);
+          if (existingIdx >= 0) {
+            updatedVars[existingIdx] = { ...updatedVars[existingIdx], value: ev.value, enabled: true };
+            hasNew = true;
+          } else {
+            updatedVars.push({ key: ev.key, value: ev.value, enabled: true });
+            hasNew = true;
+          }
+        }
+        if (hasNew) {
+          const newEnv: EnvironmentData = {
+            ...activeEnvironment,
+            variables: updatedVars,
+          };
+          await handleSaveEnvironment(newEnv);
+          showToast(`⚡ 自动从响应提取并同步 ${extractedVars.length} 个环境变量`);
+        }
+      }
+
       setResponse(resp);
 
       const newHistoryItem: HistoryItem = {
@@ -285,6 +380,7 @@ export const App: React.FC = () => {
       const newFilePath = await apiClient.createFileOrFolder(targetDir, reqName, false);
       const tree = await apiClient.loadFileTree();
       setFileTree(tree);
+      await refreshGitStatus();
       await handleSelectFile(newFilePath);
       showToast('已新建接口文件');
     } catch (e: any) {
@@ -302,6 +398,7 @@ export const App: React.FC = () => {
       await apiClient.createFileOrFolder(targetDir, folderName.trim(), true);
       const tree = await apiClient.loadFileTree();
       setFileTree(tree);
+      await refreshGitStatus();
       showToast(`已创建目录 ${folderName}`);
     } catch (e: any) {
       showToast(`创建目录失败: ${e.message}`);
@@ -314,6 +411,7 @@ export const App: React.FC = () => {
       await apiClient.deleteFileOrFolder(path);
       const tree = await apiClient.loadFileTree();
       setFileTree(tree);
+      await refreshGitStatus();
       // 关闭对应 tab
       setTabs(prev => {
         const remaining = prev.filter(t => t.filePath !== path);
@@ -331,39 +429,13 @@ export const App: React.FC = () => {
       const newPath = await apiClient.renameFileOrFolder(oldPath, newName);
       const tree = await apiClient.loadFileTree();
       setFileTree(tree);
+      await refreshGitStatus();
       setTabs(prev =>
         prev.map(t => (t.filePath === oldPath ? { ...t, filePath: newPath, request: { ...t.request, name: newName } } : t))
       );
       showToast('重命名成功');
     } catch (e: any) {
       showToast(`重命名失败: ${e.message}`);
-    }
-  };
-
-  // 保存环境变量
-  const handleSaveEnvironment = async (env: EnvironmentData) => {
-    try {
-      await apiClient.saveEnvironment(workspacePath, env);
-      const envs = await apiClient.loadEnvironments(workspacePath);
-      setEnvironments(envs);
-      showToast(`已保存环境变量 ${env.name}`);
-    } catch (e: any) {
-      showToast(`保存环境变量失败: ${e.message}`);
-    }
-  };
-
-  // 删除环境变量
-  const handleDeleteEnvironment = async (envId: string) => {
-    try {
-      await apiClient.deleteEnvironment(workspacePath, envId);
-      const envs = await apiClient.loadEnvironments(workspacePath);
-      setEnvironments(envs);
-      if (selectedEnvId === envId) {
-        setSelectedEnvId(envs[0]?.id || '');
-      }
-      showToast('已删除环境变量');
-    } catch (e: any) {
-      showToast(`删除环境失败: ${e.message}`);
     }
   };
 
@@ -398,16 +470,15 @@ export const App: React.FC = () => {
   const handleImportBatchCollection = async (result: ImportedCollectionResult) => {
     try {
       for (const item of result.items) {
-        // 构建目录路径
         let parentDir = workspacePath;
         for (const segment of item.folderPath) {
           parentDir = await apiClient.createFileOrFolder(parentDir, segment, true);
         }
-        // 创建文件
         await apiClient.createFileOrFolder(parentDir, item.request.name, false, item.request);
       }
       const tree = await apiClient.loadFileTree();
       setFileTree(tree);
+      await refreshGitStatus();
       showToast(`成功批量导入 ${result.items.length} 个接口至本地集合！`);
     } catch (e: any) {
       showToast(`批量导入失败: ${e.message}`);
@@ -452,7 +523,11 @@ export const App: React.FC = () => {
         selectedEnvId={selectedEnvId}
         onSelectEnv={setSelectedEnvId}
         onOpenEnvModal={() => setIsEnvModalOpen(true)}
-        onOpenCurlModal={() => setIsImportModalOpen(true)}
+        onOpenImportModal={() => setIsImportModalOpen(true)}
+        onOpenCodeSnippet={() => setIsCodeModalOpen(true)}
+        onOpenGitModal={() => setIsGitModalOpen(true)}
+        gitBranch={gitStatus?.branch}
+        gitModifiedCount={gitStatus?.modified_files.length}
         onNewRequest={() => handleCreateRequest()}
         onSaveCurrentRequest={handleSaveRequest}
         onSendRequest={handleSendRequest}
@@ -497,6 +572,7 @@ export const App: React.FC = () => {
               onChange={handleUpdateRequest}
               onSend={handleSendRequest}
               isSending={isSending}
+              onOpenCodeSnippet={() => setIsCodeModalOpen(true)}
             />
           </div>
 
@@ -522,6 +598,24 @@ export const App: React.FC = () => {
         onClose={() => setIsImportModalOpen(false)}
         onImportSingle={handleImportSingleCurl}
         onImportBatchCollection={handleImportBatchCollection}
+      />
+
+      {/* Code Snippet Modal */}
+      <CodeSnippetModal
+        isOpen={isCodeModalOpen}
+        onClose={() => setIsCodeModalOpen(false)}
+        request={currentRequest}
+        environment={activeEnvironment}
+      />
+
+      {/* Git Status Modal */}
+      <GitStatusModal
+        isOpen={isGitModalOpen}
+        onClose={() => setIsGitModalOpen(false)}
+        workspacePath={workspacePath}
+        gitStatus={gitStatus}
+        onOpenExplorer={() => apiClient.openInExplorer(workspacePath)}
+        onRefreshGit={() => refreshGitStatus()}
       />
 
       {/* Toast Notification */}

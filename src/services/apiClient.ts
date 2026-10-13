@@ -4,9 +4,13 @@ import {
   ResponsePayload,
   FileTreeNode,
   EnvironmentData,
-  KeyValueItem
+  KeyValueItem,
+  GitStatusResult
 } from '../types/api';
 import { interpolateText } from '../utils/curl';
+
+export type { GitStatusResult };
+
 
 export const isTauri = (): boolean => {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -438,4 +442,23 @@ export const apiClient = {
       };
     }
   },
+
+  async getGitStatus(workspacePath: string): Promise<GitStatusResult> {
+    if (isTauri()) {
+      return await invoke<GitStatusResult>('get_git_status', { workspacePath });
+    }
+    return {
+      is_git_repo: true,
+      branch: 'master',
+      modified_files: [],
+    };
+  },
+
+  async openInExplorer(path: string): Promise<void> {
+    if (isTauri()) {
+      return await invoke('open_in_explorer', { path });
+    }
+    alert(`在桌面端将打开本地目录: ${path}`);
+  },
 };
+

@@ -622,6 +622,90 @@ fn init_sample_workspace(workspace_path: Option<String>) -> Result<String, Strin
     Ok(ws.to_string_lossy().to_string())
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GitStatusResult {
+    pub is_git_repo: bool,
+    pub branch: String,
+    pub modified_files: Vec<String>,
+}
+
+#[tauri::command]
+fn get_git_status(workspace_path: String) -> Result<GitStatusResult, String> {
+    let ws_path = Path::new(&workspace_path);
+    let repo_dir = if ws_path.file_name().and_then(|s| s.to_str()) == Some("tongyun-collections") {
+        ws_path.parent().unwrap_or(ws_path)
+    } else {
+        ws_path
+    };
+
+    // 1. 获取当前 Git 分支
+    let branch_out = std::process::Command::new("git")
+        .args(&["rev-parse", "--abbrev-ref", "HEAD"])
+        .current_dir(repo_dir)
+        .output();
+
+    if let Ok(out) = branch_out {
+        if out.status.success() {
+            let branch = String::from_utf8_lossy(&out.stdout).trim().to_string();
+
+            // 2. 检查针对 tongyun-collections 的未提交文件状态
+            let status_out = std::process::Command::new("git")
+                .args(&["status", "--porcelain", "tongyun-collections"])
+                .current_dir(repo_dir)
+                .output();
+
+            let mut modified_files = Vec::new();
+            if let Ok(s_out) = status_out {
+                let status_str = String::from_utf8_lossy(&s_out.stdout);
+                for line in status_str.lines() {
+                    let trimmed = line.trim();
+                    if !trimmed.is_empty() {
+                        modified_files.push(trimmed.to_string());
+                    }
+                }
+            }
+
+            return Ok(GitStatusResult {
+                is_git_repo: true,
+                branch,
+                modified_files,
+            });
+        }
+    }
+
+    Ok(GitStatusResult {
+        is_git_repo: false,
+        branch: "非Git仓库".to_string(),
+        modified_files: Vec::new(),
+    })
+}
+
+#[tauri::command]
+fn open_in_explorer(path: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -638,7 +722,9 @@ pub fn run() {
             load_environments,
             save_environment,
             delete_environment,
-            init_sample_workspace
+            init_sample_workspace,
+            get_git_status,
+            open_in_explorer
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
