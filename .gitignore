@@ -34,3 +34,5 @@ http-client.private.env.json
 .env
 .env.*
 !.env.example
+.tongyun-trace.json
+

@@ -18,9 +18,11 @@ import {
   EnvironmentData,
   RequestAssertion,
   VariableExtraction,
-  AssertionType
+  AssertionType,
+  ResponsePayload
 } from '../types/api';
 import { exportToCurl } from '../utils/curl';
+import { generateSmartAssertions } from '../utils/tester';
 import { getMethodBadgeColor } from './Sidebar';
 
 interface RequestEditorProps {
@@ -30,6 +32,8 @@ interface RequestEditorProps {
   onSend: () => void;
   isSending: boolean;
   onOpenCodeSnippet?: () => void;
+  lastResponse?: ResponsePayload | null;
+  onToast?: (msg: string) => void;
 }
 
 export const RequestEditor: React.FC<RequestEditorProps> = ({
@@ -39,6 +43,8 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
   onSend,
   isSending,
   onOpenCodeSnippet,
+  lastResponse,
+  onToast,
 }) => {
   const [activeTab, setActiveTab] = useState<'params' | 'headers' | 'auth' | 'body' | 'tests' | 'docs'>('params');
   const [copiedCurl, setCopiedCurl] = useState(false);
@@ -789,6 +795,24 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
                   >
                     + JSON 字段
                   </button>
+                  {lastResponse && (
+                    <button
+                      onClick={() => {
+                        const smart = generateSmartAssertions(lastResponse);
+                        const existing = request.tests || [];
+                        onChange({
+                          ...request,
+                          tests: [...existing, ...smart],
+                        });
+                        if (onToast) onToast(`⚡ 已根据当前响应智能生成 ${smart.length} 条测试断言`);
+                      }}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-medium text-[11px] border border-amber-500/30 transition-colors ml-1"
+                      title="根据当前接口真实响应的状态码、耗时和数据结构自动生成推荐断言"
+                    >
+                      <Wand2 className="w-3 h-3 text-amber-400" />
+                      <span>智能推荐断言</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => handleAddAssertion()}
                     className="flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-[11px] transition-colors ml-1"

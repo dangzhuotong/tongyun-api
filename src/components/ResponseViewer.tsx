@@ -12,16 +12,24 @@ import {
   CheckCircle2,
   XCircle,
   Variable,
-  CheckSquare
+  CheckSquare,
+  Bot
 } from 'lucide-react';
-import { ResponsePayload } from '../types/api';
+import { ResponsePayload, RequestData } from '../types/api';
 
 interface ResponseViewerProps {
   response: ResponsePayload | null;
   isSending: boolean;
+  currentRequest?: RequestData;
+  onCopyAiPrompt?: () => void;
 }
 
-export const ResponseViewer: React.FC<ResponseViewerProps> = ({ response, isSending }) => {
+export const ResponseViewer: React.FC<ResponseViewerProps> = ({
+  response,
+  isSending,
+  currentRequest,
+  onCopyAiPrompt,
+}) => {
   const [activeTab, setActiveTab] = useState<'body' | 'headers' | 'tests' | 'preview'>('body');
   const [viewMode, setViewMode] = useState<'pretty' | 'raw'>('pretty');
   const [copied, setCopied] = useState(false);
@@ -239,6 +247,17 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({ response, isSend
                 Raw
               </button>
             </div>
+          )}
+
+          {onCopyAiPrompt && (
+            <button
+              onClick={onCopyAiPrompt}
+              className="flex items-center gap-1 px-2.5 py-1 rounded bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-xs text-sky-300 font-medium transition-colors"
+              title={`复制 ${currentRequest?.name || '当前接口'} 的 AI 诊断 Prompt`}
+            >
+              <Bot className="w-3.5 h-3.5 text-sky-400" />
+              <span>复制给 AI 诊断</span>
+            </button>
           )}
 
           <button

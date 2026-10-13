@@ -8,16 +8,19 @@ import { EnvironmentModal } from './components/EnvironmentModal';
 import { ImportModal } from './components/ImportModal';
 import { CodeSnippetModal } from './components/CodeSnippetModal';
 import { GitStatusModal } from './components/GitStatusModal';
+import { AiInspectorModal } from './components/AiInspectorModal';
+import { CollectionRunnerModal } from './components/CollectionRunnerModal';
 import { apiClient, GitStatusResult } from './services/apiClient';
 import {
   RequestData,
   ResponsePayload,
   FileTreeNode,
   EnvironmentData,
-  HistoryItem
+  HistoryItem,
+  ExecutionLogItem
 } from './types/api';
 import { ImportedCollectionResult } from './utils/importers';
-import { evaluateAssertions, extractVariables } from './utils/tester';
+import { evaluateAssertions, extractVariables, generateAiDiagnosticPrompt } from './utils/tester';
 
 const createDefaultRequest = (): RequestData => ({
   id: `req_${Date.now()}`,
@@ -60,10 +63,13 @@ export const App: React.FC = () => {
   const [response, setResponse] = useState<ResponsePayload | null>(null);
   const [isSending, setIsSending] = useState<boolean>(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [executionLogs, setExecutionLogs] = useState<ExecutionLogItem[]>([]);
   const [isEnvModalOpen, setIsEnvModalOpen] = useState<boolean>(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
   const [isCodeModalOpen, setIsCodeModalOpen] = useState<boolean>(false);
   const [isGitModalOpen, setIsGitModalOpen] = useState<boolean>(false);
+  const [isAiInspectorOpen, setIsAiInspectorOpen] = useState<boolean>(false);
+  const [isCollectionRunnerOpen, setIsCollectionRunnerOpen] = useState<boolean>(false);
   const [gitStatus, setGitStatus] = useState<GitStatusResult | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -154,6 +160,15 @@ export const App: React.FC = () => {
     if (savedHistory) {
       try {
         setHistory(JSON.parse(savedHistory));
+      } catch {
+        // ignore
+      }
+    }
+
+    const savedLogs = localStorage.getItem('tongyun_api_execution_logs');
+    if (savedLogs) {
+      try {
+        setExecutionLogs(JSON.parse(savedLogs));
       } catch {
         // ignore
       }
@@ -357,8 +372,31 @@ export const App: React.FC = () => {
         localStorage.setItem('tongyun_api_history', JSON.stringify(next));
         return next;
       });
+
+      const logItem: ExecutionLogItem = {
+        id: `log_${Date.now()}`,
+        timestamp: Date.now(),
+        source: 'gui',
+        requestName: currentRequest.name,
+        method: currentRequest.method,
+        url: currentRequest.url,
+        status: resp.status,
+        statusText: resp.status_text,
+        timeMs: resp.time_ms,
+        sizeBytes: resp.size_bytes,
+        assertionsTotal: testResults.length,
+        assertionsPassed: testResults.filter(t => t.passed).length,
+        request: JSON.parse(JSON.stringify(currentRequest)),
+        response: resp,
+      };
+
+      setExecutionLogs(prev => {
+        const next = [logItem, ...prev.slice(0, 99)];
+        localStorage.setItem('tongyun_api_execution_logs', JSON.stringify(next));
+        return next;
+      });
     } catch (e: any) {
-      setResponse({
+      const errResp: ResponsePayload = {
         status: 0,
         status_text: 'Error',
         headers: [],
@@ -366,10 +404,65 @@ export const App: React.FC = () => {
         time_ms: 0,
         size_bytes: 0,
         is_json: false,
+      };
+      setResponse(errResp);
+
+      const logItem: ExecutionLogItem = {
+        id: `log_err_${Date.now()}`,
+        timestamp: Date.now(),
+        source: 'gui',
+        requestName: currentRequest.name,
+        method: currentRequest.method,
+        url: currentRequest.url,
+        status: 0,
+        statusText: 'Error',
+        timeMs: 0,
+        sizeBytes: 0,
+        assertionsTotal: 0,
+        assertionsPassed: 0,
+        request: JSON.parse(JSON.stringify(currentRequest)),
+        response: errResp,
+      };
+      setExecutionLogs(prev => {
+        const next = [logItem, ...prev.slice(0, 99)];
+        localStorage.setItem('tongyun_api_execution_logs', JSON.stringify(next));
+        return next;
       });
     } finally {
       setIsSending(false);
     }
+  };
+
+  // 执行指定文件的请求（供批量跑批使用）
+  const handleExecuteRequestFile = async (filePath: string, env: EnvironmentData | null) => {
+    const req = await apiClient.readRequestFile(filePath);
+    const resp = await apiClient.executeHttpRequest(req, env);
+    const testResults = evaluateAssertions(req.tests, resp);
+    resp.test_results = testResults;
+    const extractedVars = extractVariables(req.extracts, resp);
+    resp.extracted_vars = extractedVars;
+    return { request: req, response: resp };
+  };
+
+  // 重放请求到工作区
+  const handleReplayRequest = (req: RequestData, resp: ResponsePayload) => {
+    const newTab: TabItem = {
+      id: `tab_replay_${Date.now()}`,
+      request: JSON.parse(JSON.stringify(req)),
+      isDirty: false,
+    };
+    setTabs(prev => [...prev, newTab]);
+    setActiveTabId(newTab.id);
+    setResponse(resp);
+    showToast(`已在工作区重放 ${req.method} ${req.name}`);
+  };
+
+  // 复制当前调试接口的 AI 诊断 Prompt
+  const handleCopyAiPrompt = () => {
+    if (!currentRequest) return;
+    const prompt = generateAiDiagnosticPrompt(currentRequest, response, { environmentName: activeEnvironment?.name });
+    navigator.clipboard.writeText(prompt);
+    showToast('已复制 AI 诊断 Prompt 到剪贴板');
   };
 
   // 新建请求文件
@@ -526,6 +619,9 @@ export const App: React.FC = () => {
         onOpenImportModal={() => setIsImportModalOpen(true)}
         onOpenCodeSnippet={() => setIsCodeModalOpen(true)}
         onOpenGitModal={() => setIsGitModalOpen(true)}
+        onOpenAiInspector={() => setIsAiInspectorOpen(true)}
+        onOpenCollectionRunner={() => setIsCollectionRunnerOpen(true)}
+        executionLogsCount={executionLogs.length}
         gitBranch={gitStatus?.branch}
         gitModifiedCount={gitStatus?.modified_files.length}
         onNewRequest={() => handleCreateRequest()}
@@ -573,12 +669,19 @@ export const App: React.FC = () => {
               onSend={handleSendRequest}
               isSending={isSending}
               onOpenCodeSnippet={() => setIsCodeModalOpen(true)}
+              lastResponse={response}
+              onToast={showToast}
             />
           </div>
 
           {/* Bottom half: Response Viewer */}
           <div className="flex-1 flex flex-col min-h-[240px]">
-            <ResponseViewer response={response} isSending={isSending} />
+            <ResponseViewer
+              response={response}
+              isSending={isSending}
+              currentRequest={currentRequest}
+              onCopyAiPrompt={handleCopyAiPrompt}
+            />
           </div>
         </main>
       </div>
@@ -592,7 +695,7 @@ export const App: React.FC = () => {
         onDeleteEnvironment={handleDeleteEnvironment}
       />
 
-      {/* Unified Import Modal (cURL / Postman / Swagger) */}
+      {/* Unified Import Modal (cURL / Postman / Swagger / .http) */}
       <ImportModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
@@ -616,6 +719,38 @@ export const App: React.FC = () => {
         gitStatus={gitStatus}
         onOpenExplorer={() => apiClient.openInExplorer(workspacePath)}
         onRefreshGit={() => refreshGitStatus()}
+      />
+
+      {/* AI Inspector Live Observability Modal */}
+      <AiInspectorModal
+        isOpen={isAiInspectorOpen}
+        onClose={() => setIsAiInspectorOpen(false)}
+        logs={executionLogs}
+        onClearLogs={() => {
+          setExecutionLogs([]);
+          localStorage.removeItem('tongyun_api_execution_logs');
+          showToast('已清空所有执行审计记录');
+        }}
+        onReplayRequest={handleReplayRequest}
+        showToast={showToast}
+      />
+
+      {/* Collection Runner Automated Regression Modal */}
+      <CollectionRunnerModal
+        isOpen={isCollectionRunnerOpen}
+        onClose={() => setIsCollectionRunnerOpen(false)}
+        fileTree={fileTree}
+        environments={environments}
+        selectedEnvId={selectedEnvId}
+        onExecuteRequestFile={handleExecuteRequestFile}
+        onRecordLog={log => {
+          setExecutionLogs(prev => {
+            const next = [log, ...prev.slice(0, 99)];
+            localStorage.setItem('tongyun_api_execution_logs', JSON.stringify(next));
+            return next;
+          });
+        }}
+        showToast={showToast}
       />
 
       {/* Toast Notification */}

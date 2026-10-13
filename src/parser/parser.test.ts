@@ -257,4 +257,15 @@ describe("examples", () => {
     const local = resolveRequest(basics.requests[0], merged.variables.local);
     expect(local.url.startsWith("http://127.0.0.1:8080/")).toBe(true);
   });
+
+  it("resolves dynamic system variables when resolveDynamic is enabled", () => {
+    const res = substitute("id={{$uuid}}&time={{$timestamp}}&int={{$randomInt}}", {}, {
+      resolveDynamic: true,
+    });
+    expect(res.missing).toEqual([]);
+    expect(res.unsupported).toEqual([]);
+    expect(res.text).not.toContain("{{$uuid}}");
+    expect(res.text).toMatch(/^id=[a-f0-9-]{36}&time=\d+&int=\d+$/);
+  });
 });
+

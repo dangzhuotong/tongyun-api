@@ -4,6 +4,7 @@ const VARIABLE = /\{\{\s*(\$[A-Za-z_][\w.-]*|[A-Za-z_][\w.-]*)\s*\}\}/g;
 
 export interface SubstituteOptions {
   maskKeys?: ReadonlySet<string>;
+  resolveDynamic?: boolean;
 }
 
 export interface ResolvedRequest {
@@ -13,6 +14,27 @@ export interface ResolvedRequest {
   body: string;
   missing: string[];
   unsupported: string[];
+}
+
+export function generateDynamicVariable(name: string): string | null {
+  switch (name) {
+    case "$uuid":
+      return typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+            const r = (Math.random() * 16) | 0;
+            const v = c === "x" ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+          });
+    case "$timestamp":
+      return Math.floor(Date.now() / 1000).toString();
+    case "$isoTimestamp":
+      return new Date().toISOString();
+    case "$randomInt":
+      return Math.floor(Math.random() * 10000).toString();
+    default:
+      return null;
+  }
 }
 
 export function maskSecret(value: string): string {
@@ -29,6 +51,10 @@ export function substitute(
   const unsupported = new Set<string>();
   const text = input.replace(VARIABLE, (raw, name: string) => {
     if (name.startsWith("$")) {
+      if (options.resolveDynamic) {
+        const dyn = generateDynamicVariable(name);
+        if (dyn !== null) return dyn;
+      }
       unsupported.add(name);
       return raw;
     }

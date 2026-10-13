@@ -305,8 +305,91 @@ fn load_file_tree(workspace_path: Option<String>) -> Result<Vec<FileTreeNode>, S
 #[tauri::command]
 fn read_request_file(file_path: String) -> Result<RequestData, String> {
     let content = fs::read_to_string(&file_path).map_err(|e| format!("读取文件失败: {}", e))?;
-    let data: RequestData = serde_json::from_str(&content).map_err(|e| format!("解析请求文件失败: {}", e))?;
-    Ok(data)
+    if let Ok(data) = serde_json::from_str::<RequestData>(&content) {
+        return Ok(data);
+    }
+
+    // 尝试解析纯文本 IntelliJ .http / .rest 格式
+    let mut method = "GET".to_string();
+    let mut url = "https://httpbin.org/get".to_string();
+    let mut headers = Vec::new();
+    let mut body = String::new();
+    let mut is_body = false;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if !is_body {
+            if trimmed.starts_with("###") || trimmed.starts_with("#") || trimmed.starts_with("//") {
+                continue;
+            }
+            if trimmed.is_empty() {
+                is_body = true;
+                continue;
+            }
+            if trimmed.starts_with("GET ")
+                || trimmed.starts_with("POST ")
+                || trimmed.starts_with("PUT ")
+                || trimmed.starts_with("DELETE ")
+                || trimmed.starts_with("PATCH ")
+                || trimmed.starts_with("HEAD ")
+                || trimmed.starts_with("OPTIONS ")
+            {
+                let parts: Vec<&str> = trimmed.split_whitespace().collect();
+                if parts.len() >= 2 {
+                    method = parts[0].to_string();
+                    url = parts[1].to_string();
+                }
+            } else if trimmed.contains(':') && !trimmed.starts_with("http") {
+                let parts: Vec<&str> = trimmed.splitn(2, ':').collect();
+                headers.push(KeyValueItem {
+                    key: parts[0].trim().to_string(),
+                    value: parts[1].trim().to_string(),
+                    enabled: true,
+                    description: None,
+                });
+            }
+        } else {
+            body.push_str(line);
+            body.push('\n');
+        }
+    }
+
+    let file_name = Path::new(&file_path)
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| "HTTP用例".to_string());
+
+    let body_trimmed = body.trim();
+    let body_type = if body_trimmed.starts_with('{') || body_trimmed.starts_with('[') {
+        "json".to_string()
+    } else if !body_trimmed.is_empty() {
+        "raw".to_string()
+    } else {
+        "none".to_string()
+    };
+
+    Ok(RequestData {
+        id: format!("http_{}", chrono::Utc::now().timestamp_millis()),
+        name: file_name,
+        method,
+        url,
+        headers,
+        params: vec![],
+        body: RequestBody {
+            body_type,
+            content: body_trimmed.to_string(),
+        },
+        auth: RequestAuth {
+            auth_type: "none".to_string(),
+            token: None,
+            username: None,
+            password: None,
+            api_key_name: None,
+            api_key_value: None,
+            api_key_in: None,
+        },
+        description: Some("源自 .http 纯文本规范文件".to_string()),
+    })
 }
 
 #[tauri::command]
@@ -314,6 +397,24 @@ fn save_request_file(file_path: String, data: RequestData) -> Result<(), String>
     if let Some(parent) = Path::new(&file_path).parent() {
         fs::create_dir_all(parent).map_err(|e| format!("创建父目录失败: {}", e))?;
     }
+
+    if file_path.ends_with(".http") || file_path.ends_with(".rest") {
+        let mut text = format!("### {}\n", data.name);
+        text.push_str(&format!("{} {}\n", data.method, data.url));
+        for h in &data.headers {
+            if h.enabled && !h.key.trim().is_empty() {
+                text.push_str(&format!("{}: {}\n", h.key, h.value));
+            }
+        }
+        if data.body.body_type != "none" && !data.body.content.trim().is_empty() {
+            text.push('\n');
+            text.push_str(data.body.content.trim());
+            text.push('\n');
+        }
+        fs::write(&file_path, text).map_err(|e| format!("写入文件失败: {}", e))?;
+        return Ok(());
+    }
+
     let formatted = serde_json::to_string_pretty(&data).map_err(|e| format!("序列化失败: {}", e))?;
     fs::write(&file_path, formatted).map_err(|e| format!("写入文件失败: {}", e))?;
     Ok(())

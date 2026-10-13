@@ -130,3 +130,42 @@ export interface GitStatusResult {
   modified_files: string[];
 }
 
+export interface ExecutionLogItem {
+  id: string;
+  timestamp: number;
+  source: 'gui' | 'cli' | 'agent' | 'runner';
+  requestName: string;
+  method: HttpMethod;
+  url: string;
+  status: number;
+  statusText: string;
+  timeMs: number;
+  sizeBytes: number;
+  assertionsTotal: number;
+  assertionsPassed: number;
+  request: RequestData;
+  response: ResponsePayload;
+}
+
+export interface BatchRunItemResult {
+  requestName: string;
+  method: HttpMethod;
+  url: string;
+  status: number;
+  timeMs: number;
+  passed: boolean;
+  assertionResults: AssertionResult[];
+  error?: string;
+}
+
+export interface BatchRunReport {
+  id: string;
+  timestamp: number;
+  collectionName: string;
+  total: number;
+  passed: number;
+  failed: number;
+  totalTimeMs: number;
+  results: BatchRunItemResult[];
+}
+

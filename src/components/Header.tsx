@@ -9,7 +9,9 @@ import {
   RefreshCw,
   GitBranch,
   Code2,
-  Download
+  Download,
+  Bot,
+  Zap
 } from 'lucide-react';
 import { EnvironmentData } from '../types/api';
 
@@ -22,6 +24,9 @@ interface HeaderProps {
   onOpenImportModal: () => void;
   onOpenCodeSnippet: () => void;
   onOpenGitModal: () => void;
+  onOpenAiInspector: () => void;
+  onOpenCollectionRunner: () => void;
+  executionLogsCount?: number;
   gitBranch?: string;
   gitModifiedCount?: number;
   onNewRequest: () => void;
@@ -42,6 +47,9 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenImportModal,
   onOpenCodeSnippet,
   onOpenGitModal,
+  onOpenAiInspector,
+  onOpenCollectionRunner,
+  executionLogsCount,
   gitBranch,
   gitModifiedCount,
   onNewRequest,
@@ -152,6 +160,31 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </div>
 
+        {/* AI Inspector Button */}
+        <button
+          onClick={onOpenAiInspector}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-sky-300 transition-colors"
+          title="打开 AI 运行流与实时观测台 (AI Inspector)"
+        >
+          <Bot className="w-3.5 h-3.5 text-sky-400" />
+          <span>AI 观测台</span>
+          {executionLogsCount !== undefined && executionLogsCount > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-sky-500/20 text-sky-300 font-mono">
+              {executionLogsCount}
+            </span>
+          )}
+        </button>
+
+        {/* Collection Runner Button */}
+        <button
+          onClick={onOpenCollectionRunner}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-emerald-300 transition-colors"
+          title="批量执行集合与自动化回归 (Collection Runner)"
+        >
+          <Zap className="w-3.5 h-3.5 text-emerald-400" />
+          <span>批量回归</span>
+        </button>
+
         {/* Code Snippet Button */}
         <button
           onClick={onOpenCodeSnippet}
@@ -166,7 +199,7 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           onClick={onOpenImportModal}
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 transition-colors"
-          title="导入 cURL / Postman / Swagger 集合"
+          title="导入 cURL / Postman / Swagger / .http 集合"
         >
           <Download className="w-3.5 h-3.5 text-emerald-400" />
           <span>导入</span>
