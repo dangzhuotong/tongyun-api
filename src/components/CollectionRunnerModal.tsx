@@ -280,40 +280,40 @@ ${
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 select-none">
-      <div className="w-full max-w-4xl h-[85vh] bg-slate-900 border border-slate-800 rounded-xl shadow-2xl flex flex-col overflow-hidden animate-fade-in">
-        {/* Header */}
-        <div className="h-14 px-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/50 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 select-none">
+      <div className="w-full max-w-4xl h-[85vh] bg-[var(--ty-surface)] border border-[var(--ty-border)] rounded-[var(--ty-radius-lg)] shadow-[var(--ty-shadow-pop)] flex flex-col overflow-hidden animate-fade-in">
+        {/* Header (44px) */}
+        <div className="h-11 px-4 border-b border-[var(--ty-border)] flex items-center justify-between bg-[var(--ty-surface-raised)] shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-matcha-soft)] border border-[var(--ty-matcha)]/30 flex items-center justify-center text-[var(--ty-matcha)]">
               <Zap className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-slate-100">批量测试套件执行器 (Collection Runner)</span>
-                <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-300 font-mono">
+                <span className="text-xs font-semibold text-[var(--ty-text)]">批量测试套件执行器 (Collection Runner)</span>
+                <span className="px-1.5 py-0.2 rounded text-[10px] bg-[var(--ty-matcha-soft)] text-[var(--ty-matcha)] font-mono border border-[var(--ty-matcha)]/30">
                   AUTOMATION
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-[var(--ty-text-subtle)]">
                 顺序执行指定目录或全量纯文本接口用例，自动校验断言并生成测试报告
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+            className="text-[var(--ty-text-subtle)] hover:text-[var(--ty-text)] p-1 rounded hover:bg-[var(--ty-surface)] transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Configuration Bar */}
-        <div className="p-4 bg-slate-950/30 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4 shrink-0 text-xs">
-          <div className="flex flex-wrap items-center gap-4">
+        <div className="p-3 bg-[var(--ty-surface-sunken)] border-b border-[var(--ty-border)] flex flex-wrap items-center justify-between gap-3 shrink-0 text-xs">
+          <div className="flex flex-wrap items-center gap-3">
             {/* Target Folder */}
-            <div className="flex items-center gap-2">
-              <span className="text-slate-400">测试范围:</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[var(--ty-text-muted)]">测试范围:</span>
               <select
                 value={selectedFolder}
                 onChange={e => {
@@ -321,7 +321,7 @@ ${
                   setReport(null);
                 }}
                 disabled={isRunning}
-                className="bg-slate-900 border border-slate-800 text-slate-200 rounded px-2.5 py-1.5 text-xs outline-none focus:border-sky-500"
+                className="bg-[var(--ty-surface)] border border-[var(--ty-border)] text-[var(--ty-text)] rounded-[var(--ty-radius-xs,4px)] px-2 py-1 text-xs outline-none focus:border-[var(--ty-matcha)]"
               >
                 <option value="all">全量接口 ({allRequestFiles.length} 个文件)</option>
                 {folders.map(f => (
@@ -333,13 +333,13 @@ ${
             </div>
 
             {/* Environment */}
-            <div className="flex items-center gap-2">
-              <span className="text-slate-400">执行环境:</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[var(--ty-text-muted)]">执行环境:</span>
               <select
                 value={selectedEnv}
                 onChange={e => setSelectedEnv(e.target.value)}
                 disabled={isRunning}
-                className="bg-slate-900 border border-slate-800 text-slate-200 rounded px-2.5 py-1.5 text-xs outline-none focus:border-sky-500"
+                className="bg-[var(--ty-surface)] border border-[var(--ty-border)] text-[var(--ty-text)] rounded-[var(--ty-radius-xs,4px)] px-2 py-1 text-xs outline-none focus:border-[var(--ty-matcha)]"
               >
                 <option value="">默认 / 无环境</option>
                 {environments.map(e => (
@@ -351,13 +351,13 @@ ${
             </div>
 
             {/* Delay */}
-            <div className="flex items-center gap-2">
-              <span className="text-slate-400">间隔延迟:</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[var(--ty-text-muted)]">间隔延迟:</span>
               <select
                 value={delayMs}
                 onChange={e => setDelayMs(Number(e.target.value))}
                 disabled={isRunning}
-                className="bg-slate-900 border border-slate-800 text-slate-200 rounded px-2 py-1.5 text-xs outline-none"
+                className="bg-[var(--ty-surface)] border border-[var(--ty-border)] text-[var(--ty-text)] rounded-[var(--ty-radius-xs,4px)] px-2 py-1 text-xs outline-none"
               >
                 <option value={0}>0 ms (无延迟)</option>
                 <option value={100}>100 ms</option>
@@ -367,13 +367,13 @@ ${
             </div>
 
             {/* Stop on Failure */}
-            <label className="flex items-center gap-1.5 cursor-pointer text-slate-300">
+            <label className="flex items-center gap-1.5 cursor-pointer text-[var(--ty-text-muted)] hover:text-[var(--ty-text)]">
               <input
                 type="checkbox"
                 checked={stopOnFailure}
                 onChange={e => setStopOnFailure(e.target.checked)}
                 disabled={isRunning}
-                className="rounded accent-emerald-500"
+                className="rounded accent-[var(--ty-matcha)] cursor-pointer"
               />
               <span>遇错中止 (Bail)</span>
             </label>
@@ -383,16 +383,16 @@ ${
           <button
             onClick={handleStartRun}
             disabled={isRunning || targetFiles.length === 0}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs shadow-lg shadow-emerald-600/20 transition-all disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-matcha)] hover:bg-[var(--ty-matcha-hover)] text-[#10140f] font-bold text-xs shadow-xs transition-all disabled:opacity-50"
           >
             {isRunning ? (
               <>
-                <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                <RotateCcw className="w-3.5 h-3.5 animate-spin text-[#10140f]" />
                 <span>跑批中 ({progress.current}/{progress.total})...</span>
               </>
             ) : (
               <>
-                <Play className="w-3.5 h-3.5 fill-current" />
+                <Play className="w-3.5 h-3.5 fill-[#10140f]" />
                 <span>开始跑批 ({targetFiles.length} 个用例)</span>
               </>
             )}
@@ -401,21 +401,21 @@ ${
 
         {/* Progress Bar (Visible when running) */}
         {isRunning && (
-          <div className="h-1 bg-slate-950 w-full overflow-hidden shrink-0">
+          <div className="h-1 bg-[var(--ty-surface-sunken)] w-full overflow-hidden shrink-0">
             <div
-              className="h-full bg-emerald-500 transition-all duration-200"
+              className="h-full bg-[var(--ty-matcha)] transition-all duration-200"
               style={{ width: `${(progress.current / Math.max(1, progress.total)) * 100}%` }}
             />
           </div>
         )}
 
         {/* Result Area */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {!report && !isRunning ? (
-            <div className="h-full flex flex-col items-center justify-center text-slate-500 py-16">
-              <Layers className="w-12 h-12 text-slate-600 mb-3" />
-              <p className="text-sm font-medium text-slate-300">准备就绪，点击右上角按钮开始回归测试</p>
-              <p className="text-xs text-slate-500 mt-1">
+            <div className="h-full flex flex-col items-center justify-center text-[var(--ty-text-subtle)] py-16">
+              <Layers className="w-10 h-10 text-[var(--ty-text-subtle)] mb-3 opacity-40" />
+              <p className="text-xs font-semibold text-[var(--ty-text)]">准备就绪，点击右上角按钮开始回归测试</p>
+              <p className="text-[11px] text-[var(--ty-text-subtle)] mt-1">
                 选定范围内共检测到 {targetFiles.length} 个纯文本接口用例文件
               </p>
             </div>
@@ -423,46 +423,46 @@ ${
             <div className="space-y-4">
               {/* Summary Cards */}
               <div className="grid grid-cols-4 gap-3">
-                <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
-                  <div className="text-[11px] text-slate-400">总执行用例</div>
-                  <div className="text-xl font-bold font-mono text-slate-100 mt-1">{report.total}</div>
+                <div className="bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] rounded-[var(--ty-radius-sm)] p-3">
+                  <div className="text-[11px] text-[var(--ty-text-muted)]">总执行用例</div>
+                  <div className="text-xl font-bold font-mono text-[var(--ty-text)] mt-1">{report.total}</div>
                 </div>
-                <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
-                  <div className="text-[11px] text-slate-400">测试通过</div>
-                  <div className="text-xl font-bold font-mono text-emerald-400 mt-1">
+                <div className="bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] rounded-[var(--ty-radius-sm)] p-3">
+                  <div className="text-[11px] text-[var(--ty-text-muted)]">测试通过</div>
+                  <div className="text-xl font-bold font-mono text-[var(--ty-matcha)] mt-1">
                     {report.passed} ({Math.round((report.passed / Math.max(1, report.total)) * 100)}%)
                   </div>
                 </div>
-                <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
-                  <div className="text-[11px] text-slate-400">测试失败</div>
-                  <div className={`text-xl font-bold font-mono mt-1 ${report.failed > 0 ? 'text-rose-400' : 'text-slate-400'}`}>
+                <div className="bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] rounded-[var(--ty-radius-sm)] p-3">
+                  <div className="text-[11px] text-[var(--ty-text-muted)]">测试失败</div>
+                  <div className={`text-xl font-bold font-mono mt-1 ${report.failed > 0 ? 'text-[var(--ty-peach)]' : 'text-[var(--ty-text-muted)]'}`}>
                     {report.failed}
                   </div>
                 </div>
-                <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
-                  <div className="text-[11px] text-slate-400">总执行耗时</div>
-                  <div className="text-xl font-bold font-mono text-indigo-400 mt-1">{report.totalTimeMs} ms</div>
+                <div className="bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] rounded-[var(--ty-radius-sm)] p-3">
+                  <div className="text-[11px] text-[var(--ty-text-muted)]">总执行耗时</div>
+                  <div className="text-xl font-bold font-mono text-[var(--ty-honey)] mt-1">{report.totalTimeMs} ms</div>
                 </div>
               </div>
 
               {/* Action Toolbar for Report */}
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <span className="text-xs font-semibold text-slate-200">执行用例详情列表</span>
+              <div className="flex items-center justify-between border-b border-[var(--ty-border)] pb-2.5">
+                <span className="text-xs font-semibold text-[var(--ty-text)]">执行用例详情列表</span>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleCopyMarkdownReport}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-[var(--ty-text)] text-xs transition-colors"
                   >
-                    {copiedReport ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedReport ? <Check className="w-3.5 h-3.5 text-[var(--ty-matcha)]" /> : <Copy className="w-3.5 h-3.5 text-[var(--ty-text-subtle)]" />}
                     <span>复制 Markdown 报告</span>
                   </button>
 
                   {report.failed > 0 && (
                     <button
                       onClick={handleCopyFailedAiPrompt}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-xs font-medium transition-colors"
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-peach-soft)] hover:brightness-105 text-[var(--ty-peach)] border border-[var(--ty-peach)]/30 text-xs font-medium transition-colors"
                     >
-                      {copiedAiPrompt ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Bot className="w-3.5 h-3.5" />}
+                      {copiedAiPrompt ? <Check className="w-3.5 h-3.5 text-[var(--ty-matcha)]" /> : <Bot className="w-3.5 h-3.5" />}
                       <span>打包失败用例发给 AI 修复</span>
                     </button>
                   )}
@@ -470,9 +470,9 @@ ${
               </div>
 
               {/* Table List */}
-              <div className="border border-slate-800 rounded-lg overflow-hidden bg-slate-950/40">
+              <div className="border border-[var(--ty-border)] rounded-[var(--ty-radius-sm)] overflow-hidden bg-[var(--ty-surface-sunken)]">
                 <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-900/80 text-slate-400 border-b border-slate-800">
+                  <thead className="bg-[var(--ty-surface-raised)] text-[var(--ty-text-muted)] border-b border-[var(--ty-border)]">
                     <tr>
                       <th className="w-12 px-3 py-2 text-center">状态</th>
                       <th className="w-16 px-3 py-2">方法</th>
@@ -482,14 +482,14 @@ ${
                       <th className="w-28 px-3 py-2 text-center">断言结果</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60 font-mono">
+                  <tbody className="divide-y divide-[var(--ty-border)]/50 font-mono">
                     {report.results.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-slate-800/30">
+                      <tr key={idx} className="hover:bg-[var(--ty-surface-raised)]/30 transition-colors">
                         <td className="px-3 py-2 text-center">
                           {item.passed ? (
-                            <CheckCircle2 className="w-4 h-4 text-emerald-400 mx-auto" />
+                            <CheckCircle2 className="w-4 h-4 text-[var(--ty-matcha)] mx-auto" />
                           ) : (
-                            <XCircle className="w-4 h-4 text-rose-400 mx-auto" />
+                            <XCircle className="w-4 h-4 text-[var(--ty-peach)] mx-auto" />
                           )}
                         </td>
                         <td className="px-3 py-2">
@@ -498,33 +498,33 @@ ${
                           </span>
                         </td>
                         <td className="px-3 py-2 font-sans">
-                          <div className="font-medium text-slate-200">{item.requestName}</div>
-                          <div className="text-[11px] font-mono text-slate-400 truncate max-w-md">{item.url}</div>
-                          {item.error && <div className="text-[11px] text-rose-400 mt-0.5">{item.error}</div>}
+                          <div className="font-medium text-[var(--ty-text)]">{item.requestName}</div>
+                          <div className="text-[11px] font-mono text-[var(--ty-text-subtle)] truncate max-w-md">{item.url}</div>
+                          {item.error && <div className="text-[11px] text-[var(--ty-peach)] mt-0.5">{item.error}</div>}
                         </td>
                         <td className="px-3 py-2 text-center">
                           <span
-                            className={`px-1.5 py-0.5 rounded text-[10px] ${
+                            className={`px-1.5 py-0.5 rounded text-[10px] border ${
                               item.status >= 200 && item.status < 400
-                                ? 'text-emerald-400 bg-emerald-500/10'
-                                : 'text-rose-400 bg-rose-500/10'
+                                ? 'text-[var(--ty-matcha)] bg-[var(--ty-matcha-soft)] border-[var(--ty-matcha)]/30'
+                                : 'text-[var(--ty-peach)] bg-[var(--ty-peach-soft)] border-[var(--ty-peach)]/30'
                             }`}
                           >
                             {item.status || 'Err'}
                           </span>
                         </td>
-                        <td className="px-3 py-2 text-center text-slate-400">{item.timeMs}ms</td>
+                        <td className="px-3 py-2 text-center text-[var(--ty-text-muted)]">{item.timeMs}ms</td>
                         <td className="px-3 py-2 text-center font-sans">
                           {item.assertionResults.length > 0 ? (
                             <span
-                              className={`text-[11px] ${
-                                item.assertionResults.every(a => a.passed) ? 'text-emerald-400' : 'text-rose-400'
+                              className={`text-[11px] font-mono ${
+                                item.assertionResults.every(a => a.passed) ? 'text-[var(--ty-matcha)]' : 'text-[var(--ty-peach)]'
                               }`}
                             >
                               {item.assertionResults.filter(a => a.passed).length}/{item.assertionResults.length}
                             </span>
                           ) : (
-                            <span className="text-slate-500 text-[11px]">无</span>
+                            <span className="text-[var(--ty-text-subtle)] text-[11px]">无</span>
                           )}
                         </td>
                       </tr>
@@ -537,11 +537,11 @@ ${
         </div>
 
         {/* Footer */}
-        <div className="h-12 px-5 border-t border-slate-800 flex items-center justify-between bg-slate-950/50 shrink-0 text-xs text-slate-400">
+        <div className="h-10 px-4 border-t border-[var(--ty-border)] flex items-center justify-between bg-[var(--ty-surface-raised)] shrink-0 text-xs text-[var(--ty-text-subtle)]">
           <span>待执行目标：{targetFiles.length} 个接口文件</span>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"
+            className="px-3 py-1 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-[var(--ty-text)] transition-colors text-xs"
           >
             关闭跑批窗口
           </button>
