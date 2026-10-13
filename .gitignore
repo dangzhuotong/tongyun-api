@@ -1,0 +1,20 @@
+node_modules
+dist
+dist-ssr
+*.local
+
+src-tauri/target
+src-tauri/gen
+
+.DS_Store
+.idea
+.vscode/*
+!.vscode/extensions.json
+*.log
+
+# 真实密钥与本机私有环境。示例只提交 *.example。
+http-client.private.env.json
+**/*.private.env.json
+.env
+.env.*
+!.env.example
