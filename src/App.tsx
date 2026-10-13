@@ -21,7 +21,8 @@ import {
   FileTreeNode,
   EnvironmentData,
   HistoryItem,
-  ExecutionLogItem
+  ExecutionLogItem,
+  TestCaseItem
 } from './types/api';
 import { ImportedCollectionResult } from './utils/importers';
 import { evaluateAssertions, extractVariables, generateAiDiagnosticPrompt } from './utils/tester';
@@ -517,6 +518,44 @@ export const App: React.FC = () => {
       },
     ];
 
+    // 格式化用例集
+    let cases: TestCaseItem[] = [];
+    if (Array.isArray(payload.cases)) {
+      cases = payload.cases.map((c: any, idx: number) => ({
+        id: c.id || `case_ai_${Date.now()}_${idx}`,
+        name: c.name || `用例 ${idx + 1}`,
+        description: c.description || '外部 Agent 注入的测试用例',
+        category: c.category || 'positive',
+        params: Array.isArray(c.params) ? c.params : (c.params && typeof c.params === 'object' ? Object.entries(c.params).map(([k, v]) => ({ key: k, value: String(v), enabled: true })) : params),
+        headers: Array.isArray(c.headers) ? c.headers : (c.headers && typeof c.headers === 'object' ? Object.entries(c.headers).map(([k, v]) => ({ key: k, value: String(v), enabled: true })) : headers),
+        body: c.body ? (typeof c.body === 'object' && c.body.body_type ? c.body : { body_type: 'json', content: JSON.stringify(c.body, null, 2) }) : { body_type: bodyType, content: bodyContent },
+        auth: c.auth || payload.auth || { auth_type: 'none' },
+        tests: Array.isArray(c.tests) ? c.tests : tests,
+      }));
+    }
+
+    // 如果指定只给当前激活接口追加或设置测试用例
+    if (payload.action === 'append_cases' || payload.action === 'set_cases') {
+      setTabs(prev =>
+        prev.map(t => {
+          if (t.id === activeTabId) {
+            const existingCases = payload.action === 'append_cases' ? (t.request.cases || []) : [];
+            return {
+              ...t,
+              request: {
+                ...t.request,
+                cases: [...existingCases, ...cases],
+              },
+              isDirty: true,
+            };
+          }
+          return t;
+        })
+      );
+      showToast(`🤖 外部 Agent 已为当前接口注入 ${cases.length} 个测试用例！`);
+      return;
+    }
+
     const newReq: RequestData = {
       id: `req_ai_${Date.now()}`,
       name: payload.name || `AI: ${method} ${payload.url || '新请求'}`,
@@ -531,7 +570,8 @@ export const App: React.FC = () => {
       auth: payload.auth || { auth_type: 'none' },
       tests,
       extracts: Array.isArray(payload.extracts) ? payload.extracts : [],
-      description: payload.description || '外部 AI Skill 推送到 UI',
+      description: payload.description || '外部 AI Agent 推送到 UI',
+      cases: cases.length > 0 ? cases : undefined,
     };
 
     const newTab: TabItem = {
@@ -543,7 +583,7 @@ export const App: React.FC = () => {
     setTabs(prev => [...prev, newTab]);
     setActiveTabId(newTab.id);
     setResponse(null);
-    showToast(`🤖 AI Skill 已将接口推入 UI: ${newReq.name}`);
+    showToast(`🤖 外部 Agent 已推入接口: ${newReq.name}`);
 
     if (payload.autoSend) {
       setTimeout(() => {
@@ -620,6 +660,40 @@ export const App: React.FC = () => {
       window.removeEventListener('message', handleWindowMessage);
     };
   }, []);
+
+  // 保持与外部 AI Bridge (4171) 的双向状态同步，使外部 Agent 可随时读取当前 UI 状态
+  useEffect(() => {
+    if (!currentRequest) return;
+    try {
+      fetch('http://127.0.0.1:4171/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          active_request: {
+            id: currentRequest.id,
+            name: currentRequest.name,
+            method: currentRequest.method,
+            url: currentRequest.url,
+            headers: currentRequest.headers,
+            params: currentRequest.params,
+            body: currentRequest.body,
+            auth: currentRequest.auth,
+            tests: currentRequest.tests,
+            cases: currentRequest.cases,
+          },
+          last_response: response ? {
+            status: response.status,
+            status_text: response.status_text,
+            time_ms: response.time_ms,
+            size_bytes: response.size_bytes,
+            headers: response.headers,
+            body: response.body?.substring(0, 5000),
+          } : null,
+          test_results: response?.test_results || null,
+        }),
+      }).catch(() => {});
+    } catch {}
+  }, [currentRequest, response]);
 
   // 执行指定文件的请求（供批量跑批使用）
   const handleExecuteRequestFile = async (filePath: string, env: EnvironmentData | null) => {
