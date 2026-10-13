@@ -14,10 +14,42 @@
   "params": [],
   "body": {
     "body_type": "json",
-    "content": "{\n  \"appName\": \"tongyun-api\",\n  \"version\": \"0.1.0\",\n  \"features\": [\n    \"纯文本存储\",\n    \"Git友好\",\n    \"免CORS原生请求\",\n    \"毫秒级响应测量\"\n  ]\n}"
+    "content": "{\n  \"appName\": \"tongyun-api\",\n  \"version\": \"0.1.0\",\n  \"features\": [\n    \"纯文本存储\",\n    \"Git友好\",\n    \"免CORS原生请求\",\n    \"毫秒级响应测量\",\n    \"断言与变量自动提取\"\n  ]\n}"
   },
   "auth": {
     "auth_type": "none"
   },
-  "description": "演示 POST JSON Body 的序列化与格式化调试"
+  "tests": [
+    {
+      "id": "t1",
+      "name": "状态码为 200",
+      "type": "status_equals",
+      "expected": "200",
+      "enabled": true
+    },
+    {
+      "id": "t2",
+      "name": "响应耗时在 2000ms 内",
+      "type": "time_less_than",
+      "expected": "2000",
+      "enabled": true
+    },
+    {
+      "id": "t3",
+      "name": "响应包含应用标识",
+      "type": "body_contains",
+      "expected": "tongyun-api",
+      "enabled": true
+    }
+  ],
+  "extracts": [
+    {
+      "id": "e1",
+      "var_name": "lastEchoUrl",
+      "source": "json",
+      "path_or_key": "url",
+      "enabled": true
+    }
+  ],
+  "description": "演示 POST JSON Body 的序列化、断言校验与环境变量提取"
 }
