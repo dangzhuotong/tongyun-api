@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "橦云接口主窗口",
+  "windows": ["main"],
+  "permissions": ["core:default", "dialog:default"]
+}

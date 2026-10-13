@@ -1,0 +1,25 @@
+# 状态码与表单。响应处理脚本只给编辑器看，发送时会丢掉。
+
+### 期望成功
+GET {{host}}/status/200
+Accept: application/json
+
+### 期望未找到
+GET {{host}}/status/404
+Accept: application/json
+
+### 提交表单
+POST {{host}}/post
+Content-Type: application/x-www-form-urlencoded
+
+note=tongyun-api&name={{name}}
+
+### 脚本不会被发送
+GET {{host}}/get
+Accept: application/json
+
+> {%
+client.test("ok", function() {
+  client.assert(response.status === 200);
+});
+%}

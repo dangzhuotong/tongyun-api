@@ -1,0 +1,22 @@
+# 中性示例，只访问 httpbin.org。不要把真实服务地址或密钥写进这个文件。
+
+### 查询参数
+GET {{host}}/get?name={{name}}
+Accept: application/json
+X-Demo-Env: {{envName}}
+X-Source: {{meta.source}}
+
+### 提交 JSON
+POST {{host}}/post
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "hello": "{{name}}",
+  "from": "tongyun-api"
+}
+
+### 回显请求头
+GET {{host}}/headers
+Accept: application/json
+X-Demo-Env: {{envName}}
