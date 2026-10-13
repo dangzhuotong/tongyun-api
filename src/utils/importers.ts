@@ -205,3 +205,71 @@ export function parseOpenApiSpec(specStr: string): ImportedCollectionResult {
 
   return result;
 }
+
+// IntelliJ .http / .rest 文件解析导入
+import { parseHttpFile } from '../parser/httpFile';
+
+export function parseHttpFileContent(content: string, filename?: string): ImportedCollectionResult {
+  const parsed = parseHttpFile(content);
+  const collectionName = filename
+    ? filename.replace(/\.(http|rest)$/i, '')
+    : 'HTTP文件导入';
+
+  const items = parsed.requests.map((r, idx) => {
+    const headers: KeyValueItem[] = r.headers.map(h => ({
+      key: h.name,
+      value: h.value,
+      enabled: true,
+    }));
+
+    let bodyType: BodyType = 'none';
+    const bodyContent = r.body || '';
+    if (bodyContent.trim()) {
+      if (bodyContent.trim().startsWith('{') || bodyContent.trim().startsWith('[')) {
+        bodyType = 'json';
+      } else {
+        bodyType = 'raw';
+      }
+    }
+
+    // 检查 Authorization: Bearer
+    let authType: 'none' | 'bearer' | 'basic' | 'apikey' = 'none';
+    let tokenVal: string | undefined;
+    const authHeader = headers.find(h => h.key.toLowerCase() === 'authorization');
+    if (authHeader) {
+      if (authHeader.value.startsWith('Bearer ')) {
+        authType = 'bearer';
+        tokenVal = authHeader.value.replace(/^Bearer\s+/, '');
+      }
+    }
+
+    const reqData: RequestData = {
+      id: `http_req_${Date.now()}_${idx}`,
+      name: r.name || `${r.method} 请求 ${idx + 1}`,
+      method: (r.method.toUpperCase() as HttpMethod) || 'GET',
+      url: r.url,
+      headers,
+      params: [],
+      body: {
+        body_type: bodyType,
+        content: bodyContent,
+      },
+      auth: {
+        auth_type: authType,
+        token: tokenVal,
+      },
+      description: `来自 .http 文件第 ${r.line} 行`,
+    };
+
+    return {
+      folderPath: [collectionName],
+      request: reqData,
+    };
+  });
+
+  return {
+    collectionName,
+    items,
+  };
+}
+
