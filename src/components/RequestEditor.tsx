@@ -47,6 +47,7 @@ import {
 import { apiClient } from '../services/apiClient';
 import { getMethodBadgeColor } from './Sidebar';
 import { WebSocketPanel } from './WebSocketPanel';
+import { JsonCodeEditor } from './JsonCodeEditor';
 
 interface RequestEditorProps {
   request: RequestData;
@@ -1391,12 +1392,12 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
 
             {request.body.body_type !== 'none' && request.body.body_type !== 'form-data' && (
               <div className="flex-1 flex flex-col min-h-[220px]">
-                <textarea
+                <JsonCodeEditor
                   value={request.body.content}
-                  onChange={e =>
+                  onChange={val =>
                     updateField('body', {
                       ...request.body,
-                      content: e.target.value,
+                      content: val,
                     })
                   }
                   placeholder={
@@ -1404,7 +1405,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
                       ? '{\n  "key": "value"\n}'
                       : '输入请求体内容...'
                   }
-                  className="w-full flex-1 bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] rounded-[var(--ty-radius-sm)] p-3 text-xs font-mono text-[var(--ty-text)] placeholder-[var(--ty-text-subtle)] focus:outline-none focus:border-[var(--ty-matcha)] transition-colors resize-none leading-relaxed"
+                  minHeight="220px"
                 />
               </div>
             )}

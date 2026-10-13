@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { ResponsePayload, RequestData } from '../types/api';
 
+import { tokenizeJsonLine } from '../utils/jsonTokenizer';
+
 const JsonLineHighlight: React.FC<{ line: string; searchQuery: string }> = ({ line, searchQuery }) => {
   const highlightQuery = (text: string) => {
     if (!searchQuery) return text;
@@ -32,34 +34,45 @@ const JsonLineHighlight: React.FC<{ line: string; searchQuery: string }> = ({ li
     );
   };
 
-  const kvMatch = line.match(/^(\s*)("([^"]+)")(\s*:\s*)(.*)$/);
-  if (kvMatch) {
-    const [, indent, , keyName, colon, valueWithTail] = kvMatch;
-    let valClass = 'text-[var(--ty-text)]';
-    const trimmedVal = valueWithTail.trim().replace(/,$/, '');
-    if (trimmedVal.startsWith('"')) {
-      valClass = 'text-emerald-400';
-    } else if (/^-?\d+(\.\d+)?$/.test(trimmedVal)) {
-      valClass = 'text-amber-400';
-    } else if (trimmedVal === 'true' || trimmedVal === 'false') {
-      valClass = 'text-purple-400';
-    } else if (trimmedVal === 'null') {
-      valClass = 'text-[var(--ty-text-subtle)] italic';
-    }
-
-    return (
-      <div className="leading-relaxed font-mono">
-        <span>{indent}</span>
-        <span className="text-sky-400 font-medium">"{highlightQuery(keyName)}"</span>
-        <span className="text-[var(--ty-text-subtle)]">{colon}</span>
-        <span className={valClass}>{highlightQuery(valueWithTail)}</span>
-      </div>
-    );
-  }
+  const tokens = tokenizeJsonLine(line);
 
   return (
-    <div className="leading-relaxed font-mono text-[var(--ty-text)]">
-      {highlightQuery(line)}
+    <div className="leading-relaxed font-mono">
+      {tokens.map((token, idx) => {
+        let colorClass = 'text-[var(--ty-text)]';
+        switch (token.type) {
+          case 'key':
+            colorClass = 'text-sky-400 font-medium';
+            break;
+          case 'string':
+            colorClass = 'text-emerald-400';
+            break;
+          case 'number':
+            colorClass = 'text-amber-400 font-mono';
+            break;
+          case 'boolean':
+            colorClass = 'text-purple-400 font-bold';
+            break;
+          case 'null':
+            colorClass = 'text-slate-400 italic';
+            break;
+          case 'variable':
+            colorClass = 'text-emerald-300 font-bold bg-emerald-950/40 px-1 py-0.2 rounded border border-emerald-500/30';
+            break;
+          case 'punctuation':
+            colorClass = 'text-slate-400';
+            break;
+          default:
+            colorClass = 'text-[var(--ty-text)]';
+            break;
+        }
+
+        return (
+          <span key={idx} className={colorClass}>
+            {highlightQuery(token.value)}
+          </span>
+        );
+      })}
     </div>
   );
 };
