@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Check,
   Copy,
@@ -16,6 +16,53 @@ import {
   Zap
 } from 'lucide-react';
 import { ResponsePayload, RequestData } from '../types/api';
+
+const JsonLineHighlight: React.FC<{ line: string; searchQuery: string }> = ({ line, searchQuery }) => {
+  const highlightQuery = (text: string) => {
+    if (!searchQuery) return text;
+    const parts = text.split(new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
+    return parts.map((part, i) =>
+      part.toLowerCase() === searchQuery.toLowerCase() ? (
+        <mark key={i} className="bg-amber-400/30 text-amber-200 px-0.5 rounded font-bold">
+          {part}
+        </mark>
+      ) : (
+        part
+      )
+    );
+  };
+
+  const kvMatch = line.match(/^(\s*)("([^"]+)")(\s*:\s*)(.*)$/);
+  if (kvMatch) {
+    const [, indent, , keyName, colon, valueWithTail] = kvMatch;
+    let valClass = 'text-[var(--ty-text)]';
+    const trimmedVal = valueWithTail.trim().replace(/,$/, '');
+    if (trimmedVal.startsWith('"')) {
+      valClass = 'text-emerald-400';
+    } else if (/^-?\d+(\.\d+)?$/.test(trimmedVal)) {
+      valClass = 'text-amber-400';
+    } else if (trimmedVal === 'true' || trimmedVal === 'false') {
+      valClass = 'text-purple-400';
+    } else if (trimmedVal === 'null') {
+      valClass = 'text-[var(--ty-text-subtle)] italic';
+    }
+
+    return (
+      <div className="leading-relaxed font-mono">
+        <span>{indent}</span>
+        <span className="text-sky-400 font-medium">"{highlightQuery(keyName)}"</span>
+        <span className="text-[var(--ty-text-subtle)]">{colon}</span>
+        <span className={valClass}>{highlightQuery(valueWithTail)}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="leading-relaxed font-mono text-[var(--ty-text)]">
+      {highlightQuery(line)}
+    </div>
+  );
+};
 
 interface ResponseViewerProps {
   response: ResponsePayload | null;
@@ -35,6 +82,38 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
   const [copied, setCopied] = useState(false);
   const [copiedHeaders, setCopiedHeaders] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const formattedBody = useMemo(() => {
+    if (!response) return '';
+    if (viewMode === 'raw') return response.body;
+
+    if (response.is_json) {
+      try {
+        const parsed = JSON.parse(response.body);
+        return JSON.stringify(parsed, null, 2);
+      } catch {
+        return response.body;
+      }
+    }
+    return response.body;
+  }, [response, viewMode]);
+
+  const bodyLines = useMemo(() => {
+    if (!formattedBody) return [];
+    return formattedBody.split('\n');
+  }, [formattedBody]);
+
+  const lineCount = bodyLines.length;
+
+  const displayedLines = useMemo(() => {
+    return bodyLines
+      .map((line, idx) => ({
+        lineNum: idx + 1,
+        text: line,
+        matches: searchQuery ? line.toLowerCase().includes(searchQuery.toLowerCase()) : true,
+      }))
+      .filter(item => item.matches);
+  }, [bodyLines, searchQuery]);
 
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -99,20 +178,6 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  const getFormattedBody = () => {
-    if (!response) return '';
-    if (viewMode === 'raw') return response.body;
-
-    if (response.is_json) {
-      try {
-        const parsed = JSON.parse(response.body);
-        return JSON.stringify(parsed, null, 2);
-      } catch {
-        return response.body;
-      }
-    }
-    return response.body;
-  };
 
   if (isSending) {
     return (
@@ -164,10 +229,6 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
     );
   }
 
-  const formattedBody = getFormattedBody();
-  const bodyLines = formattedBody.split('\n');
-  const lineCount = bodyLines.length;
-
   return (
     <div className="flex-1 flex flex-col bg-[var(--ty-surface-sunken)] overflow-hidden select-none">
       {/* Response Header Status Bar (36px compact) */}
@@ -185,10 +246,21 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
             <span className="text-[10px] opacity-75 font-normal">({getStatusMeaning(response.status)})</span>
           </div>
 
-          {/* Time Badge */}
-          <div className="flex items-center gap-1 text-[11px] font-mono text-[var(--ty-text-muted)]" title="响应耗时">
+          {/* Time Badge with Speed Indicator */}
+          <div className="flex items-center gap-1.5 text-[11px] font-mono text-[var(--ty-text-muted)]" title="网络往返耗时 (RTT)">
             <Clock className="w-3 h-3 text-[var(--ty-text-subtle)]" />
             <span>{response.time_ms} ms</span>
+            <span
+              className={`px-1 py-0.2 rounded text-[9px] font-mono font-medium ${
+                response.time_ms < 300
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25'
+                  : response.time_ms < 1000
+                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/25'
+                  : 'bg-rose-500/10 text-rose-400 border border-rose-500/25'
+              }`}
+            >
+              {response.time_ms < 300 ? '极速' : response.time_ms < 1000 ? '正常' : '较慢'}
+            </span>
           </div>
 
           {/* Size Badge */}
@@ -350,7 +422,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
 
           {activeTab === 'body' && (
             <span className="text-[10px] font-mono text-[var(--ty-text-subtle)]">
-              {lineCount} 行 · {response.is_json ? 'JSON' : 'TEXT'}
+              {searchQuery ? `${displayedLines.length}/${lineCount} 行匹配` : `${lineCount} 行`} · {response.is_json ? 'JSON' : 'TEXT'}
             </span>
           )}
         </div>
@@ -362,22 +434,32 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
           <div className="flex min-h-full">
             {/* IntelliJ Line Number Gutter */}
             <div className="select-none text-right pr-3 pl-2 py-2 text-[var(--ty-text-subtle)] font-mono text-[11px] border-r border-[var(--ty-border)]/50 bg-[var(--ty-surface-raised)]/20 shrink-0 min-w-[3rem]">
-              {bodyLines.map((_, i) => (
-                <div key={i} className="leading-relaxed opacity-60">
-                  {i + 1}
+              {displayedLines.map((item) => (
+                <div key={item.lineNum} className="leading-relaxed opacity-60">
+                  {item.lineNum}
                 </div>
               ))}
             </div>
 
             {/* Code Content Area */}
             <div className="flex-1 p-2 pl-3 overflow-x-auto">
-              <pre className="text-[var(--ty-text)] leading-relaxed whitespace-pre font-mono">
-                {searchQuery
-                  ? bodyLines
-                      .filter(l => l.toLowerCase().includes(searchQuery.toLowerCase()))
-                      .join('\n') || `(未找到包含 "${searchQuery}" 的行)`
-                  : formattedBody || '(空响应体)'}
-              </pre>
+              {displayedLines.length === 0 ? (
+                <div className="text-[var(--ty-text-subtle)] py-4 text-center">
+                  (未找到包含 "{searchQuery}" 的响应内容)
+                </div>
+              ) : (
+                <div className="whitespace-pre font-mono text-xs">
+                  {displayedLines.map((item) =>
+                    response.is_json && viewMode === 'pretty' ? (
+                      <JsonLineHighlight key={item.lineNum} line={item.text} searchQuery={searchQuery} />
+                    ) : (
+                      <div key={item.lineNum} className="leading-relaxed text-[var(--ty-text)] font-mono">
+                        {item.text}
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}

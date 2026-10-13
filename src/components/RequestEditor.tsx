@@ -74,6 +74,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [aiPromptInput, setAiPromptInput] = useState('');
   const [isTemplateMenuOpen, setIsTemplateMenuOpen] = useState(false);
+  const [isVarMenuOpen, setIsVarMenuOpen] = useState(false);
 
   // 测试用例集状态
   const [runningCaseId, setRunningCaseId] = useState<string | null>(null);
@@ -82,6 +83,20 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
   const [newCaseCategory, setNewCaseCategory] = useState<'positive' | 'negative' | 'boundary' | 'security'>('positive');
   const [showSaveCaseModal, setShowSaveCaseModal] = useState(false);
   const [copiedHttpCases, setCopiedHttpCases] = useState(false);
+
+  const DYNAMIC_VARIABLES_GUIDE = [
+    { tag: '{{$uuid}}', desc: '随机 UUID (v4)', sample: 'd3b07384-...' },
+    { tag: '{{$timestamp}}', desc: '当前 Unix 时间戳 (秒)', sample: '17288...' },
+    { tag: '{{$isoTimestamp}}', desc: '当前 ISO-8601 标准时间', sample: '2026-10-13T...' },
+    { tag: '{{$randomInt}}', desc: '随机整数 (0~9999)', sample: '4821' },
+    { tag: '{{$random.email}}', desc: '随机测试邮箱', sample: 'user_1234@example.com' },
+  ];
+
+  const handleInsertVariable = (varTag: string) => {
+    navigator.clipboard.writeText(varTag);
+    if (onToast) onToast(`📋 已复制变量 ${varTag} 到剪贴板，可粘贴在 URL、Headers 或 Body 中`);
+    setIsVarMenuOpen(false);
+  };
 
   // 常见接口一键模板
   const AI_TEMPLATES = [
@@ -613,6 +628,68 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
                       className="w-full text-left px-3 py-1.5 hover:bg-[var(--ty-surface)] text-xs text-[var(--ty-text)] hover:text-[var(--ty-matcha)] flex items-center gap-2 transition-colors"
                     >
                       <span>{tpl.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Variables Helper Dropdown Button */}
+          <div className="relative">
+            <button
+              onClick={() => setIsVarMenuOpen(!isVarMenuOpen)}
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-xs text-[var(--ty-text)] transition-colors"
+              title="查看与复制当前环境变量及 IntelliJ 动态变量"
+            >
+              <Variable className="w-3 h-3 text-[var(--ty-matcha)]" />
+              <span className="text-[11px] font-medium">变量助手</span>
+              <ChevronDown className="w-3 h-3 text-[var(--ty-text-subtle)]" />
+            </button>
+
+            {isVarMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setIsVarMenuOpen(false)} />
+                <div className="absolute left-0 top-full mt-1 w-64 py-1.5 bg-[var(--ty-surface-raised)] border border-[var(--ty-border)] rounded-[var(--ty-radius-sm)] shadow-[var(--ty-shadow-pop)] z-40 max-h-72 overflow-y-auto">
+                  {/* Active environment vars */}
+                  <div className="px-2.5 py-1 text-[10px] text-[var(--ty-text-subtle)] font-mono uppercase tracking-wider border-b border-[var(--ty-border)]/60 flex items-center justify-between">
+                    <span>环境变量 ({environment?.name || '默认'})</span>
+                    <span className="text-[9px] text-[var(--ty-matcha)]">点击复制</span>
+                  </div>
+                  {(!environment || !environment.variables || environment.variables.length === 0) ? (
+                    <div className="px-3 py-1.5 text-[11px] text-[var(--ty-text-subtle)]">
+                      暂无自定义环境变量 (可在右上角配置)
+                    </div>
+                  ) : (
+                    environment.variables.filter(v => v.enabled).map((v, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleInsertVariable(`{{${v.key}}}`)}
+                        className="w-full text-left px-3 py-1 hover:bg-[var(--ty-surface)] text-xs flex items-center justify-between group transition-colors"
+                      >
+                        <span className="font-mono text-[var(--ty-matcha)] text-[11px]">{"{{" + v.key + "}}"}</span>
+                        <span className="text-[10px] font-mono text-[var(--ty-text-subtle)] truncate max-w-[90px]">{v.value}</span>
+                      </button>
+                    ))
+                  )}
+
+                  {/* Dynamic variables */}
+                  <div className="px-2.5 py-1 text-[10px] text-[var(--ty-text-subtle)] font-mono uppercase tracking-wider border-t border-b border-[var(--ty-border)]/60 mt-1">
+                    IntelliJ 标准动态变量
+                  </div>
+                  {DYNAMIC_VARIABLES_GUIDE.map((dyn, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleInsertVariable(dyn.tag)}
+                      className="w-full text-left px-3 py-1.5 hover:bg-[var(--ty-surface)] text-xs flex items-center justify-between group transition-colors"
+                    >
+                      <div>
+                        <div className="font-mono text-[var(--ty-honey)] text-[11px] font-medium">{dyn.tag}</div>
+                        <div className="text-[10px] text-[var(--ty-text-subtle)]">{dyn.desc}</div>
+                      </div>
+                      <span className="text-[9px] font-mono text-[var(--ty-text-muted)] opacity-60 group-hover:opacity-100">
+                        复制
+                      </span>
                     </button>
                   ))}
                 </div>

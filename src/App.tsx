@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { GitBranch, FolderTree, Cpu } from 'lucide-react';
+import { GitBranch, FolderTree, Cpu, Keyboard } from 'lucide-react';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { TabBar, TabItem } from './components/TabBar';
@@ -11,6 +11,7 @@ import { CodeSnippetModal } from './components/CodeSnippetModal';
 import { GitStatusModal } from './components/GitStatusModal';
 import { AiInspectorModal } from './components/AiInspectorModal';
 import { CollectionRunnerModal } from './components/CollectionRunnerModal';
+import { ShortcutsModal } from './components/ShortcutsModal';
 import { apiClient, GitStatusResult, isTauri } from './services/apiClient';
 import {
   RequestData,
@@ -75,6 +76,7 @@ export const App: React.FC = () => {
   const [isGitModalOpen, setIsGitModalOpen] = useState<boolean>(false);
   const [isAiInspectorOpen, setIsAiInspectorOpen] = useState<boolean>(false);
   const [isCollectionRunnerOpen, setIsCollectionRunnerOpen] = useState<boolean>(false);
+  const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState<boolean>(false);
   const [gitStatus, setGitStatus] = useState<GitStatusResult | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -864,6 +866,26 @@ export const App: React.FC = () => {
           setActiveTabId(newTabs[Math.max(0, tabIndex - 1)].id);
         }
       }
+      if (e.altKey && (e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault();
+        setIsAiInspectorOpen(prev => !prev);
+      }
+      if (e.altKey && (e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R')) {
+        e.preventDefault();
+        setIsCollectionRunnerOpen(prev => !prev);
+      }
+      if (e.altKey && (e.ctrlKey || e.metaKey) && (e.key === 'g' || e.key === 'G')) {
+        e.preventDefault();
+        setIsGitModalOpen(prev => !prev);
+      }
+      if (e.altKey && (e.ctrlKey || e.metaKey) && (e.key === 'e' || e.key === 'E')) {
+        e.preventDefault();
+        setIsEnvModalOpen(prev => !prev);
+      }
+      if (e.key === 'F1' || (e.altKey && (e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K'))) {
+        e.preventDefault();
+        setIsShortcutsModalOpen(prev => !prev);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -1016,6 +1038,17 @@ export const App: React.FC = () => {
           <div className="h-3 w-[1px] bg-[var(--ty-border)]" />
 
           <button
+            onClick={() => setIsShortcutsModalOpen(true)}
+            className="flex items-center gap-1 text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors"
+            title="快捷键速查表 (F1 / Ctrl+Alt+K)"
+          >
+            <Keyboard className="w-3.5 h-3.5" />
+            <span>快捷键</span>
+          </button>
+
+          <div className="h-3 w-[1px] bg-[var(--ty-border)]" />
+
+          <button
             onClick={() => setIsEnvModalOpen(true)}
             className="text-[var(--ty-matcha)] hover:underline"
             title="当前激活环境"
@@ -1090,6 +1123,12 @@ export const App: React.FC = () => {
           });
         }}
         showToast={showToast}
+      />
+
+      {/* IntelliJ Keyboard Shortcuts Cheatsheet Modal */}
+      <ShortcutsModal
+        isOpen={isShortcutsModalOpen}
+        onClose={() => setIsShortcutsModalOpen(false)}
       />
 
       {/* Toast Notification */}

@@ -259,13 +259,13 @@ describe("examples", () => {
   });
 
   it("resolves dynamic system variables when resolveDynamic is enabled", () => {
-    const res = substitute("id={{$uuid}}&time={{$timestamp}}&int={{$randomInt}}", {}, {
+    const res = substitute("id={{$uuid}}&time={{$timestamp}}&int={{$randomInt}}&email={{$random.email}}", {}, {
       resolveDynamic: true,
     });
     expect(res.missing).toEqual([]);
     expect(res.unsupported).toEqual([]);
     expect(res.text).not.toContain("{{$uuid}}");
-    expect(res.text).toMatch(/^id=[a-f0-9-]{36}&time=\d+&int=\d+$/);
+    expect(res.text).toMatch(/^id=[a-f0-9-]{36}&time=\d+&int=\d+&email=user_\d+@example\.com$/);
   });
 });
 

@@ -19,6 +19,7 @@ export interface ResolvedRequest {
 export function generateDynamicVariable(name: string): string | null {
   switch (name) {
     case "$uuid":
+    case "$random.uuid":
       return typeof crypto !== "undefined" && crypto.randomUUID
         ? crypto.randomUUID()
         : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
@@ -31,7 +32,12 @@ export function generateDynamicVariable(name: string): string | null {
     case "$isoTimestamp":
       return new Date().toISOString();
     case "$randomInt":
+    case "$random.integer":
       return Math.floor(Math.random() * 10000).toString();
+    case "$random.email":
+      return `user_${Math.floor(Math.random() * 10000)}@example.com`;
+    case "$random.alphabetic":
+      return Math.random().toString(36).substring(2, 8);
     default:
       return null;
   }

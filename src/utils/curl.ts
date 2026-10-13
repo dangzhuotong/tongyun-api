@@ -1,14 +1,27 @@
 import { RequestData, EnvironmentData, HttpMethod, KeyValueItem } from '../types/api';
+import { generateDynamicVariable } from '../parser/substitute';
 
 export function interpolateText(text: string, env: EnvironmentData | null): string {
-  if (!text || !env) return text;
+  if (!text) return '';
   let result = text;
-  for (const v of env.variables) {
-    if (v.enabled && v.key.trim()) {
-      const pattern = new RegExp(`\\{\\{${v.key.trim()}\\}\\}`, 'g');
-      result = result.replace(pattern, v.value);
+  
+  // 1. 静态环境变量替换
+  if (env && env.variables) {
+    for (const v of env.variables) {
+      if (v.enabled && v.key.trim()) {
+        const escaped = v.key.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const pattern = new RegExp(`\\{\\{\\s*${escaped}\\s*\\}\\}`, 'g');
+        result = result.replace(pattern, v.value);
+      }
     }
   }
+
+  // 2. 动态变量替换 (如 {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}}, {{$randomInt}} 等)
+  result = result.replace(/\{\{\s*(\$[A-Za-z_][\w.-]*)\s*\}\}/g, (raw, name) => {
+    const dyn = generateDynamicVariable(name);
+    return dyn !== null ? dyn : raw;
+  });
+
   return result;
 }
 
