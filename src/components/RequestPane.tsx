@@ -1,7 +1,7 @@
 import { Send } from "lucide-react";
 import type { EnvironmentSet } from "../parser/env";
 import type { ParsedRequest } from "../parser/httpFile";
-import type { ResolvedRequest } from "../parser/substitute";
+import { maskSecret, type ResolvedRequest } from "../parser/substitute";
 
 interface RequestPaneProps {
   filePath: string;
@@ -55,6 +55,11 @@ export function RequestPane({
         {resolved.missing.length > 0 ? (
           <p className="warn-banner">还没有这些变量：{resolved.missing.map((name) => `{{${name}}}`).join("、")}</p>
         ) : null}
+        {resolved.unsupported.length > 0 ? (
+          <p className="warn-banner">
+            暂不支持这些动态变量：{resolved.unsupported.map((name) => `{{${name}}}`).join("、")}
+          </p>
+        ) : null}
 
         <h3>请求头</h3>
         {resolved.headers.length === 0 ? (
@@ -89,7 +94,7 @@ export function RequestPane({
                   {key}
                   {privateKeys.has(key) ? <em>私有</em> : null}
                 </dt>
-                <dd>{privateKeys.has(key) && !showPrivate ? mask(value) : value}</dd>
+                <dd>{privateKeys.has(key) && !showPrivate ? maskSecret(value) : value}</dd>
               </div>
             ))}
           </dl>
@@ -106,7 +111,3 @@ export function RequestPane({
   );
 }
 
-function mask(value: string): string {
-  if (value.length <= 4) return "••••";
-  return `${value.slice(0, 2)}••••${value.slice(-2)}`;
-}

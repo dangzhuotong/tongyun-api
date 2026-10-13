@@ -20,9 +20,9 @@ export interface EnvironmentSet {
 }
 
 /**
- * 合并多层 http-client.env.json。
- * 调用方按「从集合根到文件所在目录」排序；后面的层覆盖前面的层。
- * 同一层里 private 应排在 public 之后。
+ * 合并已经按「从集合根到某一个 .http 所在目录」排好序的环境层。
+ * 后面的层覆盖前面的层。同一目录里 private 应排在 public 之后。
+ * 不要把兄弟目录的环境文件放进同一次合并。
  */
 export function mergeEnvironmentLayers(layers: EnvLayer[]): EnvironmentSet {
   const variables: Record<string, Record<string, string>> = {};

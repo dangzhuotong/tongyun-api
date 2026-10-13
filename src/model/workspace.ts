@@ -14,26 +14,33 @@ export interface HttpFileModel {
   path: string;
   requests: Array<ParsedRequest & { id: string }>;
   warnings: ParseWarning[];
+  environments: EnvironmentSet;
 }
 
 export interface WorkspaceModel {
   files: HttpFileModel[];
-  environments: EnvironmentSet;
   problems: string[];
 }
 
-export function assembleWorkspace(httpFiles: TextFile[], envFiles: EnvFile[]): WorkspaceModel {
-  const problems: string[] = [];
+export function assembleWorkspace(
+  httpFiles: TextFile[],
+  envFiles: EnvFile[],
+  extraProblems: string[] = [],
+): WorkspaceModel {
+  const problems = new Set(extraProblems);
   const files = [...httpFiles]
     .sort((a, b) => a.relativePath.localeCompare(b.relativePath))
     .map((file) => {
       const parsed = parseHttpFile(file.content);
       if (parsed.requests.length === 0 && file.content.trim() !== "") {
-        problems.push(`${file.relativePath} 里没有可发送的请求`);
+        problems.add(`${file.relativePath} 里没有可发送的请求`);
       }
+      const environments = environmentForFile(file.relativePath, envFiles);
+      for (const problem of environments.problems) problems.add(problem);
       return {
         path: file.relativePath,
         warnings: parsed.warnings,
+        environments,
         requests: parsed.requests.map((request) => ({
           ...request,
           id: `${file.relativePath}#${request.line}`,
@@ -41,23 +48,41 @@ export function assembleWorkspace(httpFiles: TextFile[], envFiles: EnvFile[]): W
       };
     });
 
-  const environments = mergeEnvironmentLayers(
-    [...envFiles].sort(compareEnvFiles).map((file) => ({
-      path: file.relativePath,
-      kind: file.kind,
-      content: file.content,
-    })),
-  );
-
-  return { files, environments, problems: [...problems, ...environments.problems] };
+  return { files, problems: [...problems] };
 }
 
-function compareEnvFiles(a: EnvFile, b: EnvFile): number {
-  const depthA = a.relativePath.split("/").length;
-  const depthB = b.relativePath.split("/").length;
-  if (depthA !== depthB) return depthA - depthB;
-  if (a.kind !== b.kind) return a.kind === "public" ? -1 : 1;
-  return a.relativePath.localeCompare(b.relativePath);
+/** 只合并从集合根目录走到该 .http 所在目录的环境文件。兄弟目录不参与。 */
+export function environmentForFile(httpPath: string, envFiles: EnvFile[]): EnvironmentSet {
+  const layers = ancestorDirectories(directoryOf(httpPath)).flatMap((dir) =>
+    envFiles
+      .filter((file) => directoryOf(file.relativePath) === dir)
+      .sort((a, b) => {
+        if (a.kind !== b.kind) return a.kind === "public" ? -1 : 1;
+        return a.relativePath.localeCompare(b.relativePath);
+      })
+      .map((file) => ({
+        path: file.relativePath,
+        kind: file.kind,
+        content: file.content,
+      })),
+  );
+  return mergeEnvironmentLayers(layers);
+}
+
+function directoryOf(relativePath: string): string {
+  const normalized = relativePath.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+  const index = normalized.lastIndexOf("/");
+  return index === -1 ? "" : normalized.slice(0, index);
+}
+
+function ancestorDirectories(dir: string): string[] {
+  if (!dir) return [""];
+  const parts = dir.split("/").filter(Boolean);
+  const dirs = [""];
+  for (let index = 0; index < parts.length; index += 1) {
+    dirs.push(parts.slice(0, index + 1).join("/"));
+  }
+  return dirs;
 }
 
 export interface TreeDir {

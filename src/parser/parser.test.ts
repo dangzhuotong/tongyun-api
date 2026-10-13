@@ -87,6 +87,39 @@ GET https://httpbin.org/get?id=1
     expect(parsed.requests[0].body).toBe("< ./payload.json");
   });
 
+  it("uses # @name and lets it override the ### title", () => {
+    const parsed = parseHttpFile(`# @name login
+POST https://httpbin.org/login
+
+### 标题
+// @name profile
+GET https://httpbin.org/get
+`);
+    expect(parsed.requests.map((request) => request.name)).toEqual(["login", "profile"]);
+  });
+
+  it("joins indented query lines into the URL and trims header values", () => {
+    const parsed = parseHttpFile(`GET https://httpbin.org/get
+    ?a=1
+    &b=2
+X-A: v   
+Accept: application/json
+`);
+    expect(parsed.requests[0].url).toBe("https://httpbin.org/get?a=1&b=2");
+    expect(parsed.requests[0].headers).toEqual([
+      { name: "X-A", value: "v" },
+      { name: "Accept", value: "application/json" },
+    ]);
+    expect(parsed.requests[0].body).toBe("");
+  });
+
+  it("reads a JSON body that is missing the blank line and warns", () => {
+    const parsed = parseHttpFile('POST https://httpbin.org/post\n{"a":1}\n');
+    expect(parsed.requests[0].headers).toEqual([]);
+    expect(parsed.requests[0].body).toBe('{"a":1}');
+    expect(parsed.warnings[0].message).toContain("空行");
+  });
+
   it("reports a separator that never becomes a request", () => {
     const parsed = parseHttpFile("### 只有名字\n# 注释\n");
     expect(parsed.requests).toHaveLength(0);
@@ -153,6 +186,23 @@ describe("environments and substitution", () => {
     });
     expect(result.text).toBe("https://httpbin.org/tongyun/tongyun/{{missing}}");
     expect(result.missing).toEqual(["missing"]);
+    expect(result.unsupported).toEqual([]);
+  });
+
+  it("reports dynamic variables instead of sending them unchanged", () => {
+    const parsed = parseHttpFile("POST {{host}}/post\n\n{{$uuid}}\n");
+    const resolved = resolveRequest(parsed.requests[0], { host: "https://httpbin.org" });
+    expect(resolved.url).toBe("https://httpbin.org/post");
+    expect(resolved.body).toBe("{{$uuid}}");
+    expect(resolved.missing).toEqual([]);
+    expect(resolved.unsupported).toEqual(["$uuid"]);
+    const masked = resolveRequest(
+      parseHttpFile("GET {{host}}/get\nAuthorization: Bearer {{token}}\n").requests[0],
+      { host: "https://httpbin.org", token: "token-a" },
+      { maskKeys: new Set(["token"]) },
+    );
+    expect(masked.headers[0].value).toBe("Bearer to••••-a");
+    expect(masked.url).toBe("https://httpbin.org/get");
   });
 
   it("resolves a whole request", () => {

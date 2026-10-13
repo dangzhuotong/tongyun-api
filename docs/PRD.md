@@ -55,7 +55,7 @@
 
 ## 文件契约
 
-详见 [AGENTS.md](../AGENTS.md)。公共契约是 IntelliJ HTTP Client 的子集：`###` 分隔、`{{var}}` 替换、`http-client.env.json` 与 `http-client.private.env.json`。
+详见 [AGENTS.md](../AGENTS.md)。公共契约是 IntelliJ HTTP Client 的子集：`###` 分隔、`# @name`、`{{var}}` 替换、`http-client.env.json` 与 `http-client.private.env.json`。环境按每个请求文件自己的目录向上合并，兄弟目录的私有变量不会套到别的请求上。
 
 ## 怎样算做完
 

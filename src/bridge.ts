@@ -15,6 +15,7 @@ export interface ScannedWorkspace {
   root: string;
   httpFiles: ScannedFile[];
   envFiles: ScannedEnvFile[];
+  warnings: string[];
 }
 
 export interface ExchangeHeader {

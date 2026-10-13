@@ -36,6 +36,8 @@ const REQUEST_LINE =
   /^([A-Za-z][A-Za-z0-9-]*)\s+(\S+)(?:\s+HTTP\/\d+(?:\.\d+)?)?$/;
 const URL_ONLY = /^(https?:\/\/\S+)$/i;
 const HEADER_LINE = /^([^:\s]+)\s*:\s*(.*)$/;
+const NAME_DIRECTIVE = /^(?:#|\/\/)\s*@name\s+(.+)$/;
+const QUERY_CONTINUATION = /^\s+[?&]/;
 
 /**
  * 解析 IntelliJ HTTP Client 的 .http / .rest 文本。
@@ -50,7 +52,7 @@ export function parseHttpFile(source: string): ParsedHttpFile {
 
   for (const block of blocks) {
     const parsed = parseBlock(block);
-    if (parsed.warning) warnings.push(parsed.warning);
+    warnings.push(...parsed.warnings);
     if (parsed.request) requests.push(parsed.request);
   }
 
@@ -83,31 +85,34 @@ function shouldKeep(block: Block): boolean {
   });
 }
 
-function parseBlock(block: Block): { request?: ParsedRequest; warning?: ParseWarning } {
+function parseBlock(block: Block): { request?: ParsedRequest; warnings: ParseWarning[] } {
+  const warnings: ParseWarning[] = [];
   const cursor = { index: 0 };
-  skipPreamble(block.lines, cursor);
+  const directiveName = skipPreamble(block.lines, cursor);
   if (cursor.index >= block.lines.length) {
-    return {
-      warning: {
-        line: block.lines[0]?.line ?? 1,
-        message: block.name
-          ? `请求「${block.name}」没有请求行`
-          : "空请求块已跳过",
-      },
-    };
+    warnings.push({
+      line: block.lines[0]?.line ?? 1,
+      message: block.name ? `请求「${block.name}」没有请求行` : "空请求块已跳过",
+    });
+    return { warnings };
   }
 
   const requestLine = block.lines[cursor.index];
   const parsedLine = parseRequestLine(requestLine.text.trim());
   if (!parsedLine) {
-    return {
-      warning: {
-        line: requestLine.line,
-        message: `无法识别请求行：${requestLine.text.trim()}`,
-      },
-    };
+    warnings.push({
+      line: requestLine.line,
+      message: `无法识别请求行：${requestLine.text.trim()}`,
+    });
+    return { warnings };
   }
   cursor.index += 1;
+
+  let url = parsedLine.url;
+  while (cursor.index < block.lines.length && QUERY_CONTINUATION.test(block.lines[cursor.index].text)) {
+    url += block.lines[cursor.index].text.trim();
+    cursor.index += 1;
+  }
 
   const headers: HeaderField[] = [];
   while (cursor.index < block.lines.length) {
@@ -120,9 +125,16 @@ function parseBlock(block: Block): { request?: ParsedRequest; warning?: ParseWar
       cursor.index += 1;
       continue;
     }
+    if (looksLikeBody(current.text)) {
+      warnings.push({
+        line: current.line,
+        message: "请求体前面缺少空行，这一行已按正文读取",
+      });
+      break;
+    }
     const header = current.text.match(HEADER_LINE);
     if (!header) break;
-    headers.push({ name: header[1], value: header[2] });
+    headers.push({ name: header[1].trim(), value: header[2].trim() });
     cursor.index += 1;
   }
 
@@ -141,24 +153,23 @@ function parseBlock(block: Block): { request?: ParsedRequest; warning?: ParseWar
   }
 
   const body = bodyLines.join("\n");
-  const fileBody = body.match(/^<\s+(\S+)\s*$/);
-  const warning = fileBody
-    ? {
-        line: requestLine.line,
-        message: "MVP 不读取外部文件作为请求体",
-      }
-    : undefined;
+  if (/^<\s+\S+\s*$/.test(body)) {
+    warnings.push({
+      line: requestLine.line,
+      message: "MVP 不读取外部文件作为请求体",
+    });
+  }
 
   return {
     request: {
-      name: block.name || fallbackName(parsedLine.method, parsedLine.url),
+      name: directiveName || block.name || fallbackName(parsedLine.method, url),
       method: parsedLine.method,
-      url: parsedLine.url,
+      url,
       headers,
       body,
       line: requestLine.line,
     },
-    warning,
+    warnings,
   };
 }
 
@@ -177,10 +188,17 @@ function fallbackName(method: string, url: string): string {
   return `${method} ${short}`;
 }
 
-function skipPreamble(lines: SourceLine[], cursor: { index: number }) {
+function skipPreamble(lines: SourceLine[], cursor: { index: number }): string | null {
+  let directiveName: string | null = null;
   while (cursor.index < lines.length) {
     const text = lines[cursor.index].text;
     const trimmed = text.trim();
+    const named = trimmed.match(NAME_DIRECTIVE);
+    if (named) {
+      directiveName = named[1].trim();
+      cursor.index += 1;
+      continue;
+    }
     if (trimmed === "" || isComment(text)) {
       cursor.index += 1;
       continue;
@@ -191,6 +209,7 @@ function skipPreamble(lines: SourceLine[], cursor: { index: number }) {
     }
     break;
   }
+  return directiveName;
 }
 
 function skipHandler(lines: SourceLine[], cursor: { index: number }) {
@@ -215,4 +234,9 @@ function isComment(text: string): boolean {
 
 function isResponseHandler(text: string): boolean {
   return text.trim().startsWith(">");
+}
+
+function looksLikeBody(text: string): boolean {
+  const trimmed = text.trim();
+  return trimmed.startsWith("{") || trimmed.startsWith("[");
 }

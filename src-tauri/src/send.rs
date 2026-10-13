@@ -53,7 +53,7 @@ pub fn execute(request: &OutgoingRequest) -> Result<HttpExchange, String> {
     let client = Client::builder()
         .timeout(Duration::from_secs(30))
         .connect_timeout(Duration::from_secs(10))
-        .redirect(reqwest::redirect::Policy::limited(10))
+        .redirect(redirect_policy())
         .user_agent("tongyun-api/0.1")
         .build()
         .map_err(|err| format!("创建客户端失败：{err}"))?;
@@ -112,6 +112,26 @@ pub fn execute(request: &OutgoingRequest) -> Result<HttpExchange, String> {
         body: String::from_utf8_lossy(&bytes).into_owned(),
         truncated,
         content_type,
+    })
+}
+
+fn redirect_policy() -> reqwest::redirect::Policy {
+    reqwest::redirect::Policy::custom(|attempt| {
+        if attempt.previous().len() >= 10 {
+            return attempt.error("重定向次数过多");
+        }
+        let Some(previous) = attempt.previous().last() else {
+            return attempt.follow();
+        };
+        let next = attempt.url();
+        if previous.scheme() == next.scheme()
+            && previous.host_str() == next.host_str()
+            && previous.port_or_known_default() == next.port_or_known_default()
+        {
+            attempt.follow()
+        } else {
+            attempt.stop()
+        }
     })
 }
 
@@ -232,5 +252,94 @@ mod tests {
             .headers
             .iter()
             .any(|header| header.name.eq_ignore_ascii_case("content-type")));
+    }
+
+    #[test]
+    fn follows_a_redirect_on_the_same_origin() {
+        use std::io::Write;
+        use std::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            for step in 0..2 {
+                let (mut stream, _) = listener.accept().unwrap();
+                let _ = read_headers(&mut stream);
+                let response = if step == 0 {
+                    "HTTP/1.1 302 Found\r\nlocation: /done\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"
+                        .to_string()
+                } else {
+                    "HTTP/1.1 200 OK\r\ncontent-type: text/plain\r\ncontent-length: 2\r\nconnection: close\r\n\r\nok"
+                        .to_string()
+                };
+                stream.write_all(response.as_bytes()).unwrap();
+            }
+        });
+
+        let exchange = execute(&request("GET", &format!("http://{address}/start"))).unwrap();
+        server.join().unwrap();
+        assert_eq!(exchange.status, 200);
+        assert_eq!(exchange.body, "ok");
+    }
+
+    #[test]
+    fn stops_when_a_redirect_changes_host() {
+        use std::io::Write;
+        use std::net::TcpListener;
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
+
+        let origin = TcpListener::bind("127.0.0.1:0").unwrap();
+        let other = TcpListener::bind("127.0.0.1:0").unwrap();
+        let origin_address = origin.local_addr().unwrap();
+        let other_address = other.local_addr().unwrap();
+        let followed = Arc::new(AtomicBool::new(false));
+        let followed_flag = followed.clone();
+
+        let other_server = std::thread::spawn(move || {
+            let (mut stream, _) = other.accept().unwrap();
+            followed_flag.store(true, Ordering::SeqCst);
+            let _ = read_headers(&mut stream);
+            stream
+                .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 4\r\nconnection: close\r\n\r\nleak")
+                .unwrap();
+        });
+        let origin_server = std::thread::spawn(move || {
+            let (mut stream, _) = origin.accept().unwrap();
+            let _ = read_headers(&mut stream);
+            let response = format!(
+                "HTTP/1.1 302 Found\r\nlocation: http://{other_address}/secret\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"
+            );
+            stream.write_all(response.as_bytes()).unwrap();
+        });
+
+        let exchange = execute(&request("GET", &format!("http://{origin_address}/start"))).unwrap();
+        origin_server.join().unwrap();
+        assert_eq!(exchange.status, 302);
+        assert!(!followed.load(Ordering::SeqCst));
+        let _ = std::net::TcpStream::connect(other_address);
+        other_server.join().unwrap();
+    }
+
+    fn read_headers(stream: &mut std::net::TcpStream) -> String {
+        use std::io::Read;
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+        let mut received = Vec::new();
+        let mut buffer = [0_u8; 1024];
+        loop {
+            match stream.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(count) => {
+                    received.extend_from_slice(&buffer[..count]);
+                    if received.windows(4).any(|window| window == b"\r\n\r\n") {
+                        break;
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+        String::from_utf8_lossy(&received).into_owned()
     }
 }

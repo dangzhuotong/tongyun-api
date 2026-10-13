@@ -15,8 +15,10 @@ fn examples_dir() -> Option<String> {
 }
 
 #[tauri::command]
-fn send_http(request: send::OutgoingRequest) -> Result<send::HttpExchange, String> {
-    send::execute(&request)
+async fn send_http(request: send::OutgoingRequest) -> Result<send::HttpExchange, String> {
+    tauri::async_runtime::spawn_blocking(move || send::execute(&request))
+        .await
+        .map_err(|err| format!("发送任务中断：{err}"))?
 }
 
 pub fn run() {

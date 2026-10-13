@@ -25,7 +25,7 @@ export function App() {
   const [model, setModel] = useState<WorkspaceModel>(builtin);
   const [label, setLabel] = useState("内置示例");
   const [folder, setFolder] = useState<string | null>(null);
-  const [envName, setEnvName] = useState(builtin.environments.names[0] ?? "");
+  const [envName, setEnvName] = useState(builtin.files[0]?.environments.names[0] ?? "");
   const [selectedId, setSelectedId] = useState<string | null>(firstRequestId(builtin));
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
   const [sending, setSending] = useState(false);
@@ -39,9 +39,10 @@ export function App() {
     setModel(next);
     setLabel(nextLabel);
     setFolder(nextFolder);
-    setEnvName((current) =>
-      next.environments.names.includes(current) ? current : (next.environments.names[0] ?? ""),
-    );
+    setEnvName((current) => {
+      const names = next.files[0]?.environments.names ?? [];
+      return names.includes(current) ? current : (names[0] ?? "");
+    });
     const ids = next.files.flatMap((file) => file.requests.map((request) => request.id));
     setSelectedId(keepId && ids.includes(keepId) ? keepId : (ids[0] ?? null));
     setOutcome({ kind: "idle" });
@@ -53,7 +54,7 @@ export function App() {
       setBusy(true);
       try {
         const scanned = await scanWorkspace(root);
-        const next = assembleWorkspace(scanned.httpFiles, scanned.envFiles);
+        const next = assembleWorkspace(scanned.httpFiles, scanned.envFiles, scanned.warnings);
         applyModel(next, scanned.root, scanned.root, keepId);
       } catch (error) {
         setBanner(error instanceof Error ? error.message : "读取文件夹失败");
@@ -89,9 +90,25 @@ export function App() {
     return null;
   }, [model.files, selectedId]);
 
-  const variables = model.environments.variables[envName] ?? {};
+  const environments = selected?.file.environments;
+  const envNames = environments?.names;
+  const variables = environments?.variables[envName] ?? {};
+  const privateKeys = new Set(environments?.privateKeys[envName] ?? []);
   const resolved = selected ? resolveRequest(selected.request, variables) : null;
-  const canSend = Boolean(desktop && resolved && resolved.missing.length === 0 && !busy);
+  const preview =
+    selected && resolved
+      ? showPrivate
+        ? resolved
+        : resolveRequest(selected.request, variables, { maskKeys: privateKeys })
+      : null;
+  const canSend = Boolean(
+    desktop && resolved && resolved.missing.length === 0 && resolved.unsupported.length === 0 && !busy,
+  );
+
+  useEffect(() => {
+    const names = envNames ?? [];
+    setEnvName((current) => (names.includes(current) ? current : (names[0] ?? "")));
+  }, [envNames]);
 
   async function openFolder() {
     if (!desktop) {
@@ -154,10 +171,10 @@ export function App() {
               setEnvName(event.target.value);
               setOutcome({ kind: "idle" });
             }}
-            disabled={model.environments.names.length === 0}
+            disabled={!envNames || envNames.length === 0}
           >
-            {model.environments.names.length === 0 ? <option value="">无环境</option> : null}
-            {model.environments.names.map((name) => (
+            {!envNames || envNames.length === 0 ? <option value="">无环境</option> : null}
+            {(envNames ?? []).map((name) => (
               <option key={name} value={name}>
                 {name}
               </option>
@@ -192,13 +209,13 @@ export function App() {
             setOutcome({ kind: "idle" });
           }}
         />
-        {selected && resolved ? (
+        {selected && preview ? (
           <RequestPane
             filePath={selected.file.path}
             request={selected.request}
-            resolved={resolved}
+            resolved={preview}
             envName={envName}
-            environments={model.environments}
+            environments={selected.file.environments}
             showPrivate={showPrivate}
             onTogglePrivate={() => setShowPrivate((value) => !value)}
             sending={sending}

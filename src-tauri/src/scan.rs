@@ -36,6 +36,7 @@ pub struct ScannedWorkspace {
     pub root: String,
     pub http_files: Vec<ScannedFile>,
     pub env_files: Vec<ScannedEnv>,
+    pub warnings: Vec<String>,
 }
 
 pub fn scan_workspace(root: &Path) -> Result<ScannedWorkspace, String> {
@@ -48,7 +49,8 @@ pub fn scan_workspace(root: &Path) -> Result<ScannedWorkspace, String> {
 
     let mut http_files = Vec::new();
     let mut env_files = Vec::new();
-    walk(&root, &root, 0, &mut http_files, &mut env_files)?;
+    let mut warnings = Vec::new();
+    walk(&root, &root, 0, &mut http_files, &mut env_files, &mut warnings)?;
     http_files.sort_by(|a, b| a.relative_path.cmp(&b.relative_path));
     env_files.sort_by(|a, b| {
         depth(&a.relative_path)
@@ -61,6 +63,7 @@ pub fn scan_workspace(root: &Path) -> Result<ScannedWorkspace, String> {
         root: root.to_string_lossy().into_owned(),
         http_files,
         env_files,
+        warnings,
     })
 }
 
@@ -85,6 +88,7 @@ fn walk(
     depth: usize,
     http_files: &mut Vec<ScannedFile>,
     env_files: &mut Vec<ScannedEnv>,
+    warnings: &mut Vec<String>,
 ) -> Result<(), String> {
     if depth > MAX_DEPTH {
         return Ok(());
@@ -105,23 +109,25 @@ fn walk(
             if SKIP_DIRS.contains(&name.as_ref()) || name.starts_with('.') {
                 continue;
             }
-            walk(root, &path, depth + 1, http_files, env_files)?;
+            walk(root, &path, depth + 1, http_files, env_files, warnings)?;
             continue;
         }
         if !file_type.is_file() {
             continue;
         }
+        let relative_path = relative(root, &path);
         if name == "http-client.env.json" || name == "http-client.private.env.json" {
-            let content = read_limited(&path)?;
-            env_files.push(ScannedEnv {
-                relative_path: relative(root, &path),
-                kind: if name == "http-client.private.env.json" {
-                    "private".to_string()
-                } else {
-                    "public".to_string()
-                },
-                content,
-            });
+            if let Some(content) = read_limited(&path, &relative_path, warnings)? {
+                env_files.push(ScannedEnv {
+                    relative_path,
+                    kind: if name == "http-client.private.env.json" {
+                        "private".to_string()
+                    } else {
+                        "public".to_string()
+                    },
+                    content,
+                });
+            }
             continue;
         }
         let lower = name.to_ascii_lowercase();
@@ -129,22 +135,26 @@ fn walk(
             if http_files.len() >= MAX_FILES {
                 return Err(format!(".http 文件超过 {MAX_FILES} 个，请缩小文件夹"));
             }
-            let content = read_limited(&path)?;
-            http_files.push(ScannedFile {
-                relative_path: relative(root, &path),
-                content,
-            });
+            if let Some(content) = read_limited(&path, &relative_path, warnings)? {
+                http_files.push(ScannedFile {
+                    relative_path,
+                    content,
+                });
+            }
         }
     }
     Ok(())
 }
 
-fn read_limited(path: &Path) -> Result<String, String> {
-    let meta = fs::metadata(path).map_err(|err| format!("无法读取 {}：{err}", path.display()))?;
+fn read_limited(path: &Path, relative_path: &str, warnings: &mut Vec<String>) -> Result<Option<String>, String> {
+    let meta = fs::metadata(path).map_err(|err| format!("无法读取 {relative_path}：{err}"))?;
     if meta.len() > MAX_BYTES {
-        return Err(format!("{} 超过 512KB", path.display()));
+        warnings.push(format!("已跳过超过 512KB 的文件：{relative_path}"));
+        return Ok(None);
     }
-    fs::read_to_string(path).map_err(|err| format!("无法读取 {}：{err}", path.display()))
+    fs::read_to_string(path)
+        .map(Some)
+        .map_err(|err| format!("无法读取 {relative_path}：{err}"))
 }
 
 fn relative(root: &Path, path: &Path) -> String {
@@ -209,6 +219,22 @@ mod tests {
                 ("http-client.private.env.json", "private"),
             ]
         );
+        assert!(scanned.warnings.is_empty());
+    }
+
+    #[test]
+    fn skips_an_oversized_http_file_without_failing_the_scan() {
+        let root = tempfile::tempdir().unwrap();
+        let base = root.path();
+        fs::write(base.join("ok.http"), "GET https://httpbin.org/get\n").unwrap();
+        fs::write(base.join("big.http"), vec![b'a'; (MAX_BYTES as usize) + 1]).unwrap();
+
+        let scanned = scan_workspace(base).unwrap();
+        assert_eq!(
+            scanned.http_files.iter().map(|file| file.relative_path.as_str()).collect::<Vec<_>>(),
+            vec!["ok.http"]
+        );
+        assert_eq!(scanned.warnings, vec!["已跳过超过 512KB 的文件：big.http"]);
     }
 
     #[test]
