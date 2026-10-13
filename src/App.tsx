@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { GitBranch, FolderTree, Cpu } from 'lucide-react';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { TabBar, TabItem } from './components/TabBar';
@@ -795,7 +796,7 @@ export const App: React.FC = () => {
   }, [currentRequest, activeTab, activeEnvironment, isSending, tabs, activeTabId]);
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 text-slate-100">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[var(--ty-bg)] text-[var(--ty-text)]">
       {/* Top Header */}
       <Header
         workspacePath={workspacePath}
@@ -890,6 +891,65 @@ export const App: React.FC = () => {
           )}
         </main>
       </div>
+
+      {/* IntelliJ Workbench Status Bar (24px) */}
+      <footer className="h-6 bg-[var(--ty-surface)] border-t border-[var(--ty-border)] px-3 text-[11px] font-mono text-[var(--ty-text-subtle)] flex items-center justify-between shrink-0 select-none z-20">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsGitModalOpen(true)}
+            className="flex items-center gap-1.5 hover:text-[var(--ty-text)] transition-colors"
+            title="查看 Git 状态"
+          >
+            <GitBranch className="w-3 h-3 text-[var(--ty-matcha)]" />
+            <span className="text-[var(--ty-text-muted)]">{gitStatus?.branch || 'master'}</span>
+            {gitStatus && gitStatus.modified_files.length > 0 && (
+              <span className="px-1 rounded bg-[var(--ty-honey-soft)] text-[var(--ty-honey)] text-[10px]">
+                *{gitStatus.modified_files.length}
+              </span>
+            )}
+          </button>
+
+          <div className="h-3 w-[1px] bg-[var(--ty-border)]" />
+
+          <button
+            onClick={() => setIsCollectionRunnerOpen(true)}
+            className="flex items-center gap-1 hover:text-[var(--ty-text)] transition-colors"
+            title="接口集合树"
+          >
+            <FolderTree className="w-3 h-3 text-[var(--ty-honey)]" />
+            <span>{fileTree.length} 个目录项</span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsAiInspectorOpen(true)}
+            className="flex items-center gap-1 hover:text-[var(--ty-text)] transition-colors"
+            title="AI 观测台"
+          >
+            <Cpu className="w-3 h-3 text-[var(--ty-matcha)]" />
+            <span>AI Bridge :4171</span>
+          </button>
+
+          <div className="h-3 w-[1px] bg-[var(--ty-border)]" />
+
+          <span title="底层原生网络栈">Rust reqwest (rustls)</span>
+
+          <div className="h-3 w-[1px] bg-[var(--ty-border)]" />
+
+          <span>UTF-8</span>
+
+          <div className="h-3 w-[1px] bg-[var(--ty-border)]" />
+
+          <button
+            onClick={() => setIsEnvModalOpen(true)}
+            className="text-[var(--ty-matcha)] hover:underline"
+            title="当前激活环境"
+          >
+            {activeEnvironment ? activeEnvironment.name : 'No Environment'}
+          </button>
+        </div>
+      </footer>
 
       {/* Environment Modal */}
       <EnvironmentModal
