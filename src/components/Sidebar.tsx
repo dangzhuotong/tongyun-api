@@ -141,7 +141,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       className="bg-[var(--ty-surface-sunken)] border border-[var(--ty-matcha)] rounded px-1 text-xs text-[var(--ty-text)] outline-none"
                     />
                   ) : (
-                    <span className="font-medium truncate text-[11px]">{node.name}</span>
+                    <span className="font-medium truncate text-[11px] flex items-center gap-1">
+                      <span>{node.name}</span>
+                      {node.children && node.children.length > 0 && (
+                        <span className="text-[9px] text-[var(--ty-text-subtle)] font-mono opacity-60">
+                          {node.children.length}
+                        </span>
+                      )}
+                    </span>
                   )}
                 </div>
 
@@ -207,8 +214,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => onSelectFile(node.path)}
             className={`group flex items-center justify-between h-7 pr-2 rounded-[var(--ty-radius-xs,4px)] text-xs cursor-pointer transition-colors ${
               isSelected
-                ? 'bg-[var(--ty-matcha-soft)] text-[var(--ty-text)] font-medium border-l-2 border-[var(--ty-matcha)]'
-                : 'text-[var(--ty-text-muted)] hover:bg-[var(--ty-surface-raised)] hover:text-[var(--ty-text)]'
+                ? 'bg-[var(--ty-surface-raised)] text-[var(--ty-text)] font-semibold shadow-xs border-l-2 border-[var(--ty-matcha)]'
+                : 'text-[var(--ty-text-muted)] hover:bg-[var(--ty-surface-raised)]/60 hover:text-[var(--ty-text)]'
             }`}
           >
             <div className="flex items-center gap-1.5 truncate">
