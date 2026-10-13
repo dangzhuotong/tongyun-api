@@ -276,7 +276,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
           {/* Status Badge */}
           <div
             title={getStatusMeaning(response.status)}
-            className={`px-2 py-0.5 rounded-[var(--ty-radius-xs,4px)] border font-mono text-[11px] font-bold flex items-center gap-1.5 ${getStatusColor(
+            className={`ty-pressable animate-fade-in px-2.5 py-0.5 rounded-[var(--ty-radius-xs,4px)] border font-mono text-[11px] font-bold flex items-center gap-1.5 shadow-2xs ${getStatusColor(
               response.status
             )}`}
           >
@@ -286,7 +286,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
           </div>
 
           {/* Time Badge with Speed Indicator */}
-          <div className="flex items-center gap-1.5 text-[11px] font-mono text-[var(--ty-text-muted)]" title="网络往返耗时 (RTT)">
+          <div className="ty-pressable flex items-center gap-1.5 text-[11px] font-mono text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors cursor-default" title="网络往返耗时 (RTT)">
             <Clock className="w-3 h-3 text-[var(--ty-text-subtle)]" />
             <span>{response.time_ms} ms</span>
             <span
@@ -303,7 +303,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
           </div>
 
           {/* Size Badge */}
-          <div className="flex items-center gap-1 text-[11px] font-mono text-[var(--ty-text-muted)]" title="响应体大小">
+          <div className="ty-pressable flex items-center gap-1 text-[11px] font-mono text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors cursor-default" title="响应体大小">
             <HardDrive className="w-3 h-3 text-[var(--ty-text-subtle)]" />
             <span>{formatSize(response.size_bytes)}</span>
           </div>
@@ -311,7 +311,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
           {/* Tests Badge if ran */}
           {response.test_results && response.test_results.length > 0 && (
             <div
-              className={`px-2 py-0.2 rounded-[var(--ty-radius-xs,4px)] border font-mono text-[10px] font-medium flex items-center gap-1 ${
+              className={`ty-pressable px-2 py-0.2 rounded-[var(--ty-radius-xs,4px)] border font-mono text-[10px] font-medium flex items-center gap-1 ${
                 response.test_results.every(t => t.passed)
                   ? 'text-[var(--ty-matcha)] bg-[var(--ty-matcha-soft)] border-[var(--ty-matcha)]/40'
                   : 'text-[var(--ty-peach)] bg-[var(--ty-peach-soft)] border-[var(--ty-peach)]/40'
@@ -330,7 +330,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
 
           {/* Extracted Vars Badge */}
           {response.extracted_vars && response.extracted_vars.length > 0 && (
-            <div className="px-2 py-0.2 rounded-[var(--ty-radius-xs,4px)] border border-[var(--ty-honey)]/30 bg-[var(--ty-honey-soft)] text-[var(--ty-honey)] font-mono text-[10px] font-medium flex items-center gap-1">
+            <div className="ty-pressable px-2 py-0.2 rounded-[var(--ty-radius-xs,4px)] border border-[var(--ty-honey)]/30 bg-[var(--ty-honey-soft)] text-[var(--ty-honey)] font-mono text-[10px] font-medium flex items-center gap-1">
               <Zap className="w-3 h-3 text-[var(--ty-honey)]" />
               <span>提取 {response.extracted_vars.length} 变量</span>
             </div>
@@ -343,7 +343,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
             <div className="flex items-center bg-[var(--ty-surface-raised)] rounded-[var(--ty-radius-xs,4px)] border border-[var(--ty-border)] p-0.5 text-xs">
               <button
                 onClick={() => setViewMode('pretty')}
-                className={`px-2 py-0.5 rounded-[2px] text-[10px] font-mono transition-colors ${
+                className={`ty-pressable px-2 py-0.5 rounded-[2px] text-[10px] font-mono transition-all ${
                   viewMode === 'pretty' ? 'bg-[var(--ty-surface)] text-[var(--ty-matcha)] font-medium shadow-xs' : 'text-[var(--ty-text-muted)] hover:text-[var(--ty-text)]'
                 }`}
               >
@@ -351,7 +351,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
               </button>
               <button
                 onClick={() => setViewMode('raw')}
-                className={`px-2 py-0.5 rounded-[2px] text-[10px] font-mono transition-colors ${
+                className={`ty-pressable px-2 py-0.5 rounded-[2px] text-[10px] font-mono transition-all ${
                   viewMode === 'raw' ? 'bg-[var(--ty-surface)] text-[var(--ty-matcha)] font-medium shadow-xs' : 'text-[var(--ty-text-muted)] hover:text-[var(--ty-text)]'
                 }`}
               >
@@ -363,7 +363,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
           {onCopyAiPrompt && (
             <button
               onClick={onCopyAiPrompt}
-              className="flex items-center gap-1 px-2 py-1 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-xs text-[var(--ty-text)] hover:text-[var(--ty-matcha)] font-medium transition-colors"
+              className="ty-pressable flex items-center gap-1 px-2 py-1 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-xs text-[var(--ty-text)] hover:text-[var(--ty-matcha)] font-medium transition-all"
               title={`复制 ${currentRequest?.name || '当前接口'} 的 AI 诊断 Prompt`}
             >
               <Bot className="w-3 h-3 text-[var(--ty-matcha)]" />
@@ -373,7 +373,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
 
           <button
             onClick={handleDownloadResponse}
-            className="flex items-center gap-1 px-2 py-1 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-xs text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors"
+            className="ty-pressable flex items-center gap-1 px-2 py-1 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-xs text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-all"
             title="下载并保存响应体"
           >
             <Download className="w-3 h-3" />
@@ -382,12 +382,12 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
 
           <button
             onClick={activeTab === 'headers' ? handleCopyHeaders : handleCopy}
-            className="flex items-center gap-1 px-2 py-1 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-xs text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors"
+            className="ty-pressable flex items-center gap-1 px-2 py-1 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-xs text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-all"
             title="复制响应内容"
           >
             {(activeTab === 'headers' ? copiedHeaders : copied) ? (
               <>
-                <Check className="w-3 h-3 text-[var(--ty-matcha)]" />
+                <Check className="w-3 h-3 text-[var(--ty-matcha)] scale-110 transition-transform" />
                 <span className="text-[var(--ty-matcha)] text-[11px]">已复制</span>
               </>
             ) : (
@@ -413,9 +413,9 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`h-full px-2.5 text-xs font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
+              className={`ty-pressable h-full px-2.5 text-xs font-medium border-b-2 flex items-center gap-1.5 transition-all ${
                 activeTab === tab.id
-                  ? 'text-[var(--ty-text)] border-[var(--ty-matcha)]'
+                  ? 'text-[var(--ty-text)] border-[var(--ty-matcha)] bg-[var(--ty-surface-raised)]/30'
                   : 'text-[var(--ty-text-muted)] border-transparent hover:text-[var(--ty-text)] hover:bg-[var(--ty-surface-raised)]/50'
               }`}
             >
@@ -685,29 +685,29 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
         )}
 
         {activeTab === 'timing' && timingBreakdown && (
-          <div className="p-4 space-y-4 max-w-3xl">
+          <div className="p-4 space-y-4 max-w-3xl animate-fade-in">
             {/* Waterfall Summary Cards */}
             <div className="grid grid-cols-4 gap-2.5">
-              <div className="p-3 rounded-[var(--ty-radius-sm)] bg-[var(--ty-surface)] border border-[var(--ty-border)]">
+              <div className="p-3 rounded-[var(--ty-radius-sm)] bg-[var(--ty-surface)] border border-[var(--ty-border)] ty-pressable hover:border-[var(--ty-matcha)]/40 hover:shadow-xs transition-all">
                 <span className="text-[10px] text-[var(--ty-text-subtle)] block uppercase font-mono tracking-wider">总耗时 DURATION</span>
                 <span className="text-base font-bold font-mono text-[var(--ty-matcha)] mt-0.5 block">{response.time_ms} ms</span>
                 <span className="text-[10px] text-[var(--ty-text-subtle)] mt-0.5 block">
                   {response.time_ms < 300 ? '⚡ 极速响应' : response.time_ms < 1000 ? '✨ 正常时延' : '🐢 较慢'}
                 </span>
               </div>
-              <div className="p-3 rounded-[var(--ty-radius-sm)] bg-[var(--ty-surface)] border border-[var(--ty-border)]">
+              <div className="p-3 rounded-[var(--ty-radius-sm)] bg-[var(--ty-surface)] border border-[var(--ty-border)] ty-pressable hover:border-[var(--ty-border-strong)] hover:shadow-xs transition-all">
                 <span className="text-[10px] text-[var(--ty-text-subtle)] block uppercase font-mono tracking-wider">传输体积 SIZE</span>
                 <span className="text-base font-bold font-mono text-[var(--ty-text)] mt-0.5 block">{formatSize(response.size_bytes)}</span>
                 <span className="text-[10px] text-[var(--ty-text-subtle)] mt-0.5 block">{response.size_bytes} 字节</span>
               </div>
-              <div className="p-3 rounded-[var(--ty-radius-sm)] bg-[var(--ty-surface)] border border-[var(--ty-border)]">
+              <div className="p-3 rounded-[var(--ty-radius-sm)] bg-[var(--ty-surface)] border border-[var(--ty-border)] ty-pressable hover:border-[var(--ty-sky)]/40 hover:shadow-xs transition-all">
                 <span className="text-[10px] text-[var(--ty-text-subtle)] block uppercase font-mono tracking-wider">估算吞吐量 RATE</span>
                 <span className="text-base font-bold font-mono text-[var(--ty-sky)] mt-0.5 block">
                   {response.time_ms > 0 ? (response.size_bytes / (response.time_ms / 1000) / 1024).toFixed(1) : '0'} KB/s
                 </span>
                 <span className="text-[10px] text-[var(--ty-text-subtle)] mt-0.5 block">网络吞吐速率</span>
               </div>
-              <div className="p-3 rounded-[var(--ty-radius-sm)] bg-[var(--ty-surface)] border border-[var(--ty-border)]">
+              <div className="p-3 rounded-[var(--ty-radius-sm)] bg-[var(--ty-surface)] border border-[var(--ty-border)] ty-pressable hover:border-[var(--ty-honey)]/40 hover:shadow-xs transition-all">
                 <span className="text-[10px] text-[var(--ty-text-subtle)] block uppercase font-mono tracking-wider">底层引擎 ENGINE</span>
                 <span className="text-xs font-bold font-mono text-[var(--ty-honey)] mt-1 block">Rust reqwest</span>
                 <span className="text-[10px] text-[var(--ty-text-subtle)] mt-0.5 block">rustls 原生直连</span>
@@ -724,13 +724,13 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
                 <span className="text-[10px] font-mono text-[var(--ty-text-subtle)]">100% 比例可视化</span>
               </div>
 
-              {/* Progress segments bar */}
+              {/* Progress segments bar with smooth expansion */}
               <div className="h-4 w-full rounded-full overflow-hidden flex bg-[var(--ty-surface-sunken)] p-0.5 gap-0.5 border border-[var(--ty-border)]">
-                <div style={{ width: `${timingBreakdown.dnsPct}%` }} className="bg-sky-400 rounded-l-full h-full transition-all" title={`DNS: ${timingBreakdown.dns}ms (${timingBreakdown.dnsPct}%)`} />
-                <div style={{ width: `${timingBreakdown.tcpPct}%` }} className="bg-indigo-400 h-full transition-all" title={`TCP: ${timingBreakdown.tcp}ms (${timingBreakdown.tcpPct}%)`} />
-                <div style={{ width: `${timingBreakdown.tlsPct}%` }} className="bg-purple-400 h-full transition-all" title={`TLS: ${timingBreakdown.tls}ms (${timingBreakdown.tlsPct}%)`} />
-                <div style={{ width: `${timingBreakdown.ttfbPct}%` }} className="bg-amber-400 h-full transition-all" title={`TTFB: ${timingBreakdown.ttfb}ms (${timingBreakdown.ttfbPct}%)`} />
-                <div style={{ width: `${timingBreakdown.downloadPct}%` }} className="bg-emerald-400 rounded-r-full h-full transition-all" title={`Download: ${timingBreakdown.download}ms (${timingBreakdown.downloadPct}%)`} />
+                <div style={{ width: `${timingBreakdown.dnsPct}%` }} className="bg-sky-400 rounded-l-full h-full transition-all duration-700 ease-out" title={`DNS: ${timingBreakdown.dns}ms (${timingBreakdown.dnsPct}%)`} />
+                <div style={{ width: `${timingBreakdown.tcpPct}%` }} className="bg-indigo-400 h-full transition-all duration-700 ease-out" title={`TCP: ${timingBreakdown.tcp}ms (${timingBreakdown.tcpPct}%)`} />
+                <div style={{ width: `${timingBreakdown.tlsPct}%` }} className="bg-purple-400 h-full transition-all duration-700 ease-out" title={`TLS: ${timingBreakdown.tls}ms (${timingBreakdown.tlsPct}%)`} />
+                <div style={{ width: `${timingBreakdown.ttfbPct}%` }} className="bg-amber-400 h-full transition-all duration-700 ease-out" title={`TTFB: ${timingBreakdown.ttfb}ms (${timingBreakdown.ttfbPct}%)`} />
+                <div style={{ width: `${timingBreakdown.downloadPct}%` }} className="bg-emerald-400 rounded-r-full h-full transition-all duration-700 ease-out" title={`Download: ${timingBreakdown.download}ms (${timingBreakdown.downloadPct}%)`} />
               </div>
 
               {/* Detailed Breakdown Rows */}

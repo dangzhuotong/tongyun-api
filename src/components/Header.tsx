@@ -161,7 +161,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* AI Inspector Button */}
         <button
           onClick={onOpenAiInspector}
-          className="flex items-center gap-1 px-2 h-7 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface)] border border-[var(--ty-border)] text-xs text-[var(--ty-sky)] transition-colors"
+          className="ty-pressable flex items-center gap-1 px-2 h-7 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface)] border border-[var(--ty-border)] text-xs text-[var(--ty-sky)] transition-all"
           title="打开 AI 运行流与实时观测台 (AI Inspector)"
         >
           <Bot className="w-3 h-3 text-[var(--ty-sky)]" />
@@ -176,7 +176,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Collection Runner Button */}
         <button
           onClick={onOpenCollectionRunner}
-          className="flex items-center gap-1 px-2 h-7 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface)] border border-[var(--ty-border)] text-xs text-[var(--ty-matcha)] transition-colors"
+          className="ty-pressable flex items-center gap-1 px-2 h-7 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface)] border border-[var(--ty-border)] text-xs text-[var(--ty-matcha)] transition-all"
           title="批量执行集合与自动化回归 (Collection Runner)"
         >
           <Zap className="w-3 h-3 text-[var(--ty-matcha)]" />
@@ -186,7 +186,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Code Snippet Button */}
         <button
           onClick={onOpenCodeSnippet}
-          className="flex items-center gap-1 px-2 h-7 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface)] border border-[var(--ty-border)] text-xs text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors"
+          className="ty-pressable flex items-center gap-1 px-2 h-7 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface)] border border-[var(--ty-border)] text-xs text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-all"
           title="生成客户端调用代码 (JS/Python/Go/Rust等)"
         >
           <Code2 className="w-3 h-3 text-[var(--ty-text-subtle)]" />
@@ -196,7 +196,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Import Modal Button */}
         <button
           onClick={onOpenImportModal}
-          className="flex items-center gap-1 px-2 h-7 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface)] border border-[var(--ty-border)] text-xs text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors"
+          className="ty-pressable flex items-center gap-1 px-2 h-7 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface)] border border-[var(--ty-border)] text-xs text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-all"
           title="导入 cURL / Postman / Swagger / .http 集合"
         >
           <Download className="w-3 h-3 text-[var(--ty-text-subtle)]" />
@@ -206,7 +206,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* New Request Button */}
         <button
           onClick={onNewRequest}
-          className="flex items-center gap-1 px-2 h-7 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface)] border border-[var(--ty-border)] text-xs text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors"
+          className="ty-pressable flex items-center gap-1 px-2 h-7 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface)] border border-[var(--ty-border)] text-xs text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-all"
           title="新建空白请求"
         >
           <Plus className="w-3 h-3 text-[var(--ty-matcha)]" />
@@ -216,9 +216,9 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Save button */}
         <button
           onClick={onSaveCurrentRequest}
-          className={`flex items-center gap-1 px-2 h-7 rounded-[var(--ty-radius-xs,4px)] text-xs font-medium border transition-colors ${
+          className={`ty-pressable flex items-center gap-1 px-2 h-7 rounded-[var(--ty-radius-xs,4px)] text-xs font-medium border transition-all ${
             isDirty
-              ? 'bg-[var(--ty-honey-tint)] text-[var(--ty-honey)] border-[var(--ty-honey)]/40 hover:bg-[var(--ty-honey-tint)]/80'
+              ? 'bg-[var(--ty-honey-tint)] text-[var(--ty-honey)] border-[var(--ty-honey)]/40 hover:bg-[var(--ty-honey-tint)]/80 shadow-xs'
               : 'bg-[var(--ty-surface-raised)] text-[var(--ty-text-muted)] border-[var(--ty-border)] hover:bg-[var(--ty-surface)] hover:text-[var(--ty-text)]'
           }`}
           title="保存接口到本地仓库纯文本 (Ctrl+S)"
@@ -232,7 +232,7 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           onClick={onSendRequest}
           disabled={isSending}
-          className="flex items-center gap-1 px-3 h-7 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-matcha)] hover:bg-[var(--ty-matcha-hover)] text-[#10140f] text-xs font-bold shadow-xs active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="ty-pressable flex items-center gap-1 px-3 h-7 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-matcha)] hover:bg-[var(--ty-matcha-hover)] hover:shadow-[0_0_12px_rgba(111,173,132,0.4)] text-[#10140f] text-xs font-bold shadow-xs active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           title="发送请求 (Ctrl+Enter)"
         >
           {isSending ? (

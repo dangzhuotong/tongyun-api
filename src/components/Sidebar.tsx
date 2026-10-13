@@ -10,7 +10,6 @@ import {
   History,
   Layers,
   ChevronRight,
-  ChevronDown,
   RefreshCw,
   GitBranch,
   X
@@ -115,11 +114,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className="group flex items-center justify-between h-7 pr-2 rounded-[var(--ty-radius-xs,4px)] hover:bg-[var(--ty-surface-raised)] text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] cursor-pointer text-xs transition-colors"
               >
                 <div className="flex items-center gap-1.5 truncate">
-                  {isOpen ? (
-                    <ChevronDown className="w-3.5 h-3.5 text-[var(--ty-text-subtle)] shrink-0" />
-                  ) : (
-                    <ChevronRight className="w-3.5 h-3.5 text-[var(--ty-text-subtle)] shrink-0" />
-                  )}
+                  <ChevronRight className={`w-3.5 h-3.5 text-[var(--ty-text-subtle)] shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-90 text-[var(--ty-text)]' : ''}`} />
                   {isOpen ? (
                     <FolderOpen className="w-3.5 h-3.5 text-[var(--ty-honey)] shrink-0" />
                   ) : (
@@ -197,7 +192,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
 
               {isOpen && node.children && node.children.length > 0 && (
-                <div className="border-l border-[var(--ty-border)]/50 ml-2.5">
+                <div className="border-l border-[var(--ty-border)]/50 ml-2.5 animate-slide-down">
                   {renderTreeNodes(node.children, depth + 1)}
                 </div>
               )}

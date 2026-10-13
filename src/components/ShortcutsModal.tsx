@@ -37,8 +37,8 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose 
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs">
-      <div className="bg-[var(--ty-surface)] border border-[var(--ty-border)] rounded-[var(--ty-radius-md)] shadow-[var(--ty-shadow-pop)] w-full max-w-lg overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs animate-modal-backdrop">
+      <div className="bg-[var(--ty-surface)] border border-[var(--ty-border)] rounded-[var(--ty-radius-md)] shadow-[var(--ty-shadow-pop)] w-full max-w-lg overflow-hidden flex flex-col animate-modal-pop">
         {/* Header */}
         <div className="h-10 px-4 border-b border-[var(--ty-border)] flex items-center justify-between bg-[var(--ty-surface-raised)] select-none">
           <div className="flex items-center gap-2 text-xs font-bold text-[var(--ty-text)]">

@@ -40,3 +40,131 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--ty-border-strong);
 }
+
+/* =========================================================================
+   橦云接口 · 交互微动效与动画规范 (IntelliJ / Linear Grade Micro-Interactions)
+   ========================================================================= */
+
+@keyframes tyFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes tySlideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes tySlideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes tyModalPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes tyBackdropFade {
+  0% {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    backdrop-filter: blur(4px);
+  }
+}
+
+@keyframes tyWaterfallBarExpand {
+  0% {
+    transform: scaleX(0);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+@keyframes tyToastIn {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes tyGlowPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(111, 173, 132, 0);
+  }
+  50% {
+    box-shadow: 0 0 14px 2px rgba(111, 173, 132, 0.45);
+  }
+}
+
+.animate-fade-in {
+  animation: tyFadeIn 180ms ease-out forwards;
+}
+
+.animate-slide-up {
+  animation: tySlideInUp 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-down {
+  animation: tySlideInDown 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-modal-pop {
+  animation: tyModalPop 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-modal-backdrop {
+  animation: tyBackdropFade 200ms ease-out forwards;
+}
+
+.animate-toast {
+  animation: tyToastIn 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-glow-pulse {
+  animation: tyGlowPulse 2s infinite ease-in-out;
+}
+
+/* 触觉反馈类：按钮微点击动效 */
+.ty-pressable {
+  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease-out, box-shadow 150ms ease-out, border-color 150ms ease-out;
+}
+.ty-pressable:hover {
+  transform: translateY(-0.5px);
+}
+.ty-pressable:active {
+  transform: translateY(0.5px) scale(0.97);
+}
+

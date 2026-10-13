@@ -1133,8 +1133,8 @@ export const App: React.FC = () => {
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-4 right-4 z-50 bg-slate-800 border border-slate-700 text-slate-100 text-xs px-3.5 py-2 rounded-lg shadow-xl animate-fade-in flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-sky-400" />
+        <div className="fixed bottom-5 right-5 z-50 bg-[var(--ty-surface-raised)] border border-[var(--ty-border-strong)] text-[var(--ty-text)] text-xs px-3.5 py-2.5 rounded-[var(--ty-radius-sm)] shadow-[var(--ty-shadow-pop)] animate-toast flex items-center gap-2.5 font-medium select-none">
+          <span className="w-2 h-2 rounded-full bg-[var(--ty-matcha)] shadow-[0_0_8px_var(--ty-matcha)]" />
           <span>{toastMessage}</span>
         </div>
       )}

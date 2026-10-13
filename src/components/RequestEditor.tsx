@@ -819,7 +819,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
           <button
             onClick={onSend}
             disabled={isSending}
-            className="flex items-center gap-1.5 px-3.5 h-8 rounded-[var(--ty-radius-sm)] bg-[var(--ty-matcha)] hover:bg-[var(--ty-matcha-hover)] text-[#10140f] text-xs font-bold shadow-xs active:scale-95 transition-all disabled:opacity-50 shrink-0"
+            className="ty-pressable flex items-center gap-1.5 px-3.5 h-8 rounded-[var(--ty-radius-sm)] bg-[var(--ty-matcha)] hover:bg-[var(--ty-matcha-hover)] hover:shadow-[0_0_14px_rgba(111,173,132,0.45)] text-[#10140f] text-xs font-bold shadow-xs active:scale-95 transition-all disabled:opacity-50 shrink-0"
             title="发送请求 (Ctrl+Enter)"
           >
             {isSending ? (
@@ -859,9 +859,9 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`h-full px-2.5 text-xs font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
+                className={`ty-pressable h-full px-2.5 text-xs font-medium border-b-2 flex items-center gap-1.5 transition-all ${
                   activeTab === tab.id
-                    ? 'text-[var(--ty-text)] border-[var(--ty-matcha)]'
+                    ? 'text-[var(--ty-text)] border-[var(--ty-matcha)] bg-[var(--ty-surface-raised)]/30'
                     : 'text-[var(--ty-text-muted)] border-transparent hover:text-[var(--ty-text)] hover:bg-[var(--ty-surface-raised)]/50'
                 }`}
               >
@@ -881,7 +881,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
           </div>
 
       {/* Tab Panels */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4 animate-fade-in" key={activeTab}>
         {/* PARAMS TAB */}
         {activeTab === 'params' && (
           <div className="space-y-3">
