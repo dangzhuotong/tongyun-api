@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Play,
@@ -43,10 +43,18 @@ export const CollectionRunnerModal: React.FC<CollectionRunnerModalProps> = ({
   onRecordLog,
   showToast,
 }) => {
-  const [selectedEnv, setSelectedEnv] = useState<string>(selectedEnvId);
+  const [selectedEnv, setSelectedEnv] = useState<string>(selectedEnvId || (environments.length > 0 ? environments[0].id : ''));
   const [selectedFolder, setSelectedFolder] = useState<string>('all');
   const [stopOnFailure, setStopOnFailure] = useState(false);
   const [delayMs, setDelayMs] = useState<number>(100);
+
+  useEffect(() => {
+    if (selectedEnvId) {
+      setSelectedEnv(selectedEnvId);
+    } else if (environments.length > 0) {
+      setSelectedEnv(environments[0].id);
+    }
+  }, [selectedEnvId, environments]);
 
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });

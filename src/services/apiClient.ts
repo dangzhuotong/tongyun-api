@@ -319,28 +319,28 @@ export const apiClient = {
     environment: EnvironmentData | null
   ): Promise<ResponsePayload> {
     // 变量替换
-    const resolvedUrl = interpolateText(request.url, environment);
-    const resolvedHeaders: KeyValueItem[] = request.headers.map(h => ({
+    const resolvedUrl = interpolateText(request.url || '', environment);
+    const resolvedHeaders: KeyValueItem[] = (request.headers || []).map(h => ({
       ...h,
       key: interpolateText(h.key, environment),
       value: interpolateText(h.value, environment),
     }));
-    const resolvedParams: KeyValueItem[] = request.params.map(p => ({
+    const resolvedParams: KeyValueItem[] = (request.params || []).map(p => ({
       ...p,
       key: interpolateText(p.key, environment),
       value: interpolateText(p.value, environment),
     }));
     const resolvedBody = {
-      ...request.body,
-      content: interpolateText(request.body.content, environment),
+      ...(request.body || { body_type: 'none', content: '' }),
+      content: interpolateText(request.body?.content || '', environment),
     };
     const resolvedAuth = {
-      ...request.auth,
-      token: request.auth.token ? interpolateText(request.auth.token, environment) : undefined,
-      username: request.auth.username ? interpolateText(request.auth.username, environment) : undefined,
-      password: request.auth.password ? interpolateText(request.auth.password, environment) : undefined,
-      api_key_name: request.auth.api_key_name ? interpolateText(request.auth.api_key_name, environment) : undefined,
-      api_key_value: request.auth.api_key_value ? interpolateText(request.auth.api_key_value, environment) : undefined,
+      ...(request.auth || { auth_type: 'none' }),
+      token: request.auth?.token ? interpolateText(request.auth.token, environment) : undefined,
+      username: request.auth?.username ? interpolateText(request.auth.username, environment) : undefined,
+      password: request.auth?.password ? interpolateText(request.auth.password, environment) : undefined,
+      api_key_name: request.auth?.api_key_name ? interpolateText(request.auth.api_key_name, environment) : undefined,
+      api_key_value: request.auth?.api_key_value ? interpolateText(request.auth.api_key_value, environment) : undefined,
     };
 
     if (isTauri()) {

@@ -318,8 +318,15 @@ export const App: React.FC = () => {
   };
 
   // 发送 HTTP 请求
-  const handleSendRequest = async (overrideReq?: RequestData) => {
-    const reqToSend = overrideReq || currentRequest;
+  const handleSendRequest = async (overrideReq?: RequestData | any) => {
+    // 严格检查 overrideReq 是否为真正的 RequestData（避免 React onClick 传入 SyntheticEvent）
+    const isActualRequest =
+      overrideReq &&
+      typeof overrideReq === 'object' &&
+      !('nativeEvent' in overrideReq) &&
+      !('currentTarget' in overrideReq) &&
+      typeof overrideReq.url === 'string';
+    const reqToSend = isActualRequest ? overrideReq : currentRequest;
     if (isSending || !reqToSend) return;
     setIsSending(true);
     try {
@@ -806,7 +813,7 @@ export const App: React.FC = () => {
         gitModifiedCount={gitStatus?.modified_files.length}
         onNewRequest={() => handleCreateRequest()}
         onSaveCurrentRequest={handleSaveRequest}
-        onSendRequest={handleSendRequest}
+        onSendRequest={() => handleSendRequest()}
         onRefreshWorkspace={loadWorkspace}
         isSending={isSending}
         isDirty={isDirty}
@@ -846,7 +853,7 @@ export const App: React.FC = () => {
               request={currentRequest}
               environment={activeEnvironment}
               onChange={handleUpdateRequest}
-              onSend={handleSendRequest}
+              onSend={() => handleSendRequest()}
               isSending={isSending}
               onOpenCodeSnippet={() => setIsCodeModalOpen(true)}
               lastResponse={response}
