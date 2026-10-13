@@ -1,10 +1,16 @@
 {
-  "name": "tauri-app",
+  "name": "tongyun-api",
   "private": true,
   "version": "0.1.0",
+  "description": "橦云接口：本地优先的纯文本 API 调试桌面应用",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check:rust": "cargo check --manifest-path src-tauri/Cargo.toml",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "check": "npm run typecheck && npm run test && npm run check:rust && npm run test:rust",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri"
@@ -12,6 +18,7 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2",
     "@tauri-apps/plugin-opener": "^2",
     "clsx": "^2.1.1",
     "lucide-react": "^1.55.0",
@@ -26,6 +33,7 @@
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^6.0.2",
     "typescript": "~6.0.3",
-    "vite": "^8.3.4"
+    "vite": "^8.3.4",
+    "vitest": "^5.0.2"
   }
 }

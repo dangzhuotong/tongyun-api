@@ -12,12 +12,13 @@
   "app": {
     "windows": [
       {
-        "title": "橦云 API 调试器 (Tongyun API)",
+        "title": "橦云接口 (Tongyun API)",
         "width": 1280,
         "height": 820,
         "minWidth": 960,
         "minHeight": 640,
-        "center": true
+        "center": true,
+        "resizable": true
       }
     ],
     "security": {
