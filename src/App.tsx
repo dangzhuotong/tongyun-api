@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
+import { TabBar, TabItem } from './components/TabBar';
 import { RequestEditor } from './components/RequestEditor';
 import { ResponseViewer } from './components/ResponseViewer';
 import { EnvironmentModal } from './components/EnvironmentModal';
-import { CurlImportModal } from './components/CurlImportModal';
+import { ImportModal } from './components/ImportModal';
 import { apiClient } from './services/apiClient';
 import {
   RequestData,
@@ -13,9 +14,10 @@ import {
   EnvironmentData,
   HistoryItem
 } from './types/api';
+import { ImportedCollectionResult } from './utils/importers';
 
-const defaultBlankRequest: RequestData = {
-  id: 'blank_req',
+const createDefaultRequest = (): RequestData => ({
+  id: `req_${Date.now()}`,
   name: '新建请求',
   method: 'GET',
   url: 'https://httpbin.org/get',
@@ -24,21 +26,29 @@ const defaultBlankRequest: RequestData = {
   body: { body_type: 'none', content: '' },
   auth: { auth_type: 'none' },
   description: '自用 API 调试',
-};
+});
 
 export const App: React.FC = () => {
   const [workspacePath, setWorkspacePath] = useState<string>('');
   const [fileTree, setFileTree] = useState<FileTreeNode[]>([]);
   const [environments, setEnvironments] = useState<EnvironmentData[]>([]);
   const [selectedEnvId, setSelectedEnvId] = useState<string>('');
-  const [activeFilePath, setActiveFilePath] = useState<string | undefined>(undefined);
-  const [currentRequest, setCurrentRequest] = useState<RequestData>(defaultBlankRequest);
-  const [isDirty, setIsDirty] = useState<boolean>(false);
+
+  // 多标签页状态
+  const [tabs, setTabs] = useState<TabItem[]>([
+    {
+      id: 'tab_initial',
+      request: createDefaultRequest(),
+      isDirty: false,
+    },
+  ]);
+  const [activeTabId, setActiveTabId] = useState<string>('tab_initial');
+
   const [response, setResponse] = useState<ResponsePayload | null>(null);
   const [isSending, setIsSending] = useState<boolean>(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isEnvModalOpen, setIsEnvModalOpen] = useState<boolean>(false);
-  const [isCurlModalOpen, setIsCurlModalOpen] = useState<boolean>(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -46,7 +56,16 @@ export const App: React.FC = () => {
     setTimeout(() => setToastMessage(null), 2500);
   };
 
-  // 当前激活的环境对象
+  // 当前激活的 Tab
+  const activeTab = useMemo(() => {
+    return tabs.find(t => t.id === activeTabId) || tabs[0];
+  }, [tabs, activeTabId]);
+
+  const currentRequest = activeTab ? activeTab.request : createDefaultRequest();
+  const activeFilePath = activeTab ? activeTab.filePath : undefined;
+  const isDirty = activeTab ? activeTab.isDirty : false;
+
+  // 当前激活的环境变量对象
   const activeEnvironment = useMemo(() => {
     return environments.find(e => e.id === selectedEnvId) || null;
   }, [environments, selectedEnvId]);
@@ -54,7 +73,6 @@ export const App: React.FC = () => {
   // 加载工作区与初始化
   const loadWorkspace = useCallback(async () => {
     try {
-      // 确保初始化了样例接口库
       const ws = await apiClient.initSampleWorkspace();
       setWorkspacePath(ws);
 
@@ -67,7 +85,7 @@ export const App: React.FC = () => {
         setSelectedEnvId(envs[0].id);
       }
 
-      // 如果有接口文件，默认打开第一个
+      // 默认将树中第一个文件作为第一个标签页打开
       const findFirstFile = (nodes: FileTreeNode[]): string | null => {
         for (const n of nodes) {
           if (!n.is_dir) return n.path;
@@ -82,9 +100,15 @@ export const App: React.FC = () => {
       const firstFile = findFirstFile(tree);
       if (firstFile) {
         const req = await apiClient.readRequestFile(firstFile);
-        setActiveFilePath(firstFile);
-        setCurrentRequest(req);
-        setIsDirty(false);
+        setTabs([
+          {
+            id: `tab_${firstFile}`,
+            filePath: firstFile,
+            request: req,
+            isDirty: false,
+          },
+        ]);
+        setActiveTabId(`tab_${firstFile}`);
       }
     } catch (e: any) {
       console.error('加载工作区失败:', e);
@@ -95,7 +119,6 @@ export const App: React.FC = () => {
   useEffect(() => {
     loadWorkspace();
 
-    // 加载调用历史
     const savedHistory = localStorage.getItem('tongyun_api_history');
     if (savedHistory) {
       try {
@@ -106,35 +129,95 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  // 选择接口文件
+  // 选择文件（如果已在标签中则切过去，否则新增标签）
   const handleSelectFile = async (filePath: string) => {
+    const existingTab = tabs.find(t => t.filePath === filePath);
+    if (existingTab) {
+      setActiveTabId(existingTab.id);
+      return;
+    }
+
     try {
       const data = await apiClient.readRequestFile(filePath);
-      setActiveFilePath(filePath);
-      setCurrentRequest(data);
-      setIsDirty(false);
+      const newTab: TabItem = {
+        id: `tab_${filePath}`,
+        filePath,
+        request: data,
+        isDirty: false,
+      };
+      setTabs(prev => [...prev, newTab]);
+      setActiveTabId(newTab.id);
       setResponse(null);
     } catch (e: any) {
       showToast(`读取接口文件失败: ${e.message}`);
     }
   };
 
-  // 保存接口文件 (写回本地仓库纯文本)
+  // 更新当前标签的请求内容
+  const handleUpdateRequest = (updated: RequestData) => {
+    setTabs(prev =>
+      prev.map(t => {
+        if (t.id === activeTabId) {
+          return {
+            ...t,
+            request: updated,
+            isDirty: true,
+          };
+        }
+        return t;
+      })
+    );
+  };
+
+  // 新建标签页
+  const handleNewTab = () => {
+    const newReq = createDefaultRequest();
+    const newTab: TabItem = {
+      id: `tab_new_${Date.now()}`,
+      request: newReq,
+      isDirty: false,
+    };
+    setTabs(prev => [...prev, newTab]);
+    setActiveTabId(newTab.id);
+    setResponse(null);
+  };
+
+  // 关闭标签页
+  const handleCloseTab = (tabId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (tabs.length <= 1) return;
+    const tabIndex = tabs.findIndex(t => t.id === tabId);
+    const newTabs = tabs.filter(t => t.id !== tabId);
+    setTabs(newTabs);
+
+    if (activeTabId === tabId) {
+      const nextTab = newTabs[Math.max(0, tabIndex - 1)];
+      setActiveTabId(nextTab.id);
+    }
+  };
+
+  // 保存当前标签的接口文件到磁盘纯文本
   const handleSaveRequest = async () => {
-    if (!activeFilePath) {
-      // 如果还没有路径，先在工作区根目录创建文件
+    if (!activeTab) return;
+
+    if (!activeTab.filePath) {
       try {
         const newFilePath = await apiClient.createFileOrFolder(
           workspacePath,
-          currentRequest.name || '新建请求',
+          activeTab.request.name || '新建请求',
           false,
-          currentRequest
+          activeTab.request
         );
-        setActiveFilePath(newFilePath);
-        setIsDirty(false);
+        setTabs(prev =>
+          prev.map(t =>
+            t.id === activeTabId
+              ? { ...t, filePath: newFilePath, isDirty: false, request: { ...t.request, filePath: newFilePath } }
+              : t
+          )
+        );
         const tree = await apiClient.loadFileTree();
         setFileTree(tree);
-        showToast('已保存为纯文本文件');
+        showToast('已保存为本地纯文本文件');
       } catch (e: any) {
         showToast(`保存失败: ${e.message}`);
       }
@@ -142,9 +225,10 @@ export const App: React.FC = () => {
     }
 
     try {
-      await apiClient.saveRequestFile(activeFilePath, currentRequest);
-      setIsDirty(false);
-      // 刷新树以便更新方法徽标和名称
+      await apiClient.saveRequestFile(activeTab.filePath, activeTab.request);
+      setTabs(prev =>
+        prev.map(t => (t.id === activeTabId ? { ...t, isDirty: false } : t))
+      );
       const tree = await apiClient.loadFileTree();
       setFileTree(tree);
       showToast('已保存');
@@ -155,13 +239,12 @@ export const App: React.FC = () => {
 
   // 发送 HTTP 请求
   const handleSendRequest = async () => {
-    if (isSending) return;
+    if (isSending || !currentRequest) return;
     setIsSending(true);
     try {
       const resp = await apiClient.executeHttpRequest(currentRequest, activeEnvironment);
       setResponse(resp);
 
-      // 记录到历史
       const newHistoryItem: HistoryItem = {
         id: `hist_${Date.now()}`,
         timestamp: Date.now(),
@@ -203,7 +286,7 @@ export const App: React.FC = () => {
       const tree = await apiClient.loadFileTree();
       setFileTree(tree);
       await handleSelectFile(newFilePath);
-      showToast('已新建接口');
+      showToast('已新建接口文件');
     } catch (e: any) {
       showToast(`新建请求失败: ${e.message}`);
     }
@@ -231,11 +314,11 @@ export const App: React.FC = () => {
       await apiClient.deleteFileOrFolder(path);
       const tree = await apiClient.loadFileTree();
       setFileTree(tree);
-      if (activeFilePath === path) {
-        setActiveFilePath(undefined);
-        setCurrentRequest(defaultBlankRequest);
-        setResponse(null);
-      }
+      // 关闭对应 tab
+      setTabs(prev => {
+        const remaining = prev.filter(t => t.filePath !== path);
+        return remaining.length > 0 ? remaining : [{ id: 'tab_empty', request: createDefaultRequest(), isDirty: false }];
+      });
       showToast('已从磁盘删除');
     } catch (e: any) {
       showToast(`删除失败: ${e.message}`);
@@ -248,9 +331,9 @@ export const App: React.FC = () => {
       const newPath = await apiClient.renameFileOrFolder(oldPath, newName);
       const tree = await apiClient.loadFileTree();
       setFileTree(tree);
-      if (activeFilePath === oldPath) {
-        setActiveFilePath(newPath);
-      }
+      setTabs(prev =>
+        prev.map(t => (t.filePath === oldPath ? { ...t, filePath: newPath, request: { ...t.request, name: newName } } : t))
+      );
       showToast('重命名成功');
     } catch (e: any) {
       showToast(`重命名失败: ${e.message}`);
@@ -286,25 +369,49 @@ export const App: React.FC = () => {
 
   // 从历史恢复请求
   const handleSelectHistory = (item: HistoryItem) => {
-    setCurrentRequest(item.request);
+    const newTab: TabItem = {
+      id: `tab_hist_${Date.now()}`,
+      request: JSON.parse(JSON.stringify(item.request)),
+      isDirty: true,
+    };
+    setTabs(prev => [...prev, newTab]);
+    setActiveTabId(newTab.id);
     setResponse(item.response);
-    setIsDirty(true);
     showToast(`已从历史载入 ${item.method} 请求`);
   };
 
-  // 导入 cURL
-  const handleImportCurl = (parsed: Partial<RequestData>) => {
-    setCurrentRequest(prev => ({
-      ...prev,
+  // 导入单条 cURL
+  const handleImportSingleCurl = (parsed: Partial<RequestData>) => {
+    handleUpdateRequest({
+      ...currentRequest,
       ...parsed,
-      name: parsed.url ? `cURL_${new URL(parsed.url).pathname.split('/').pop() || '导入'}` : prev.name,
-      headers: parsed.headers || prev.headers,
-      params: parsed.params || prev.params,
-      body: parsed.body || prev.body,
-      auth: parsed.auth || prev.auth,
-    }));
-    setIsDirty(true);
-    showToast('cURL 命令已解析导入');
+      name: parsed.url ? `cURL_${new URL(parsed.url).pathname.split('/').pop() || '导入'}` : currentRequest.name,
+      headers: parsed.headers || currentRequest.headers,
+      params: parsed.params || currentRequest.params,
+      body: parsed.body || currentRequest.body,
+      auth: parsed.auth || currentRequest.auth,
+    });
+    showToast('cURL 命令已解析填充');
+  };
+
+  // 批量导入集合 (Postman / OpenAPI) 写入磁盘纯文本
+  const handleImportBatchCollection = async (result: ImportedCollectionResult) => {
+    try {
+      for (const item of result.items) {
+        // 构建目录路径
+        let parentDir = workspacePath;
+        for (const segment of item.folderPath) {
+          parentDir = await apiClient.createFileOrFolder(parentDir, segment, true);
+        }
+        // 创建文件
+        await apiClient.createFileOrFolder(parentDir, item.request.name, false, item.request);
+      }
+      const tree = await apiClient.loadFileTree();
+      setFileTree(tree);
+      showToast(`成功批量导入 ${result.items.length} 个接口至本地集合！`);
+    } catch (e: any) {
+      showToast(`批量导入失败: ${e.message}`);
+    }
   };
 
   // 全局快捷键
@@ -318,10 +425,23 @@ export const App: React.FC = () => {
         e.preventDefault();
         handleSendRequest();
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === 't') {
+        e.preventDefault();
+        handleNewTab();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'w') {
+        e.preventDefault();
+        if (tabs.length > 1) {
+          const tabIndex = tabs.findIndex(t => t.id === activeTabId);
+          const newTabs = tabs.filter(t => t.id !== activeTabId);
+          setTabs(newTabs);
+          setActiveTabId(newTabs[Math.max(0, tabIndex - 1)].id);
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentRequest, activeFilePath, activeEnvironment, isSending]);
+  }, [currentRequest, activeTab, activeEnvironment, isSending, tabs, activeTabId]);
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 text-slate-100">
@@ -332,7 +452,7 @@ export const App: React.FC = () => {
         selectedEnvId={selectedEnvId}
         onSelectEnv={setSelectedEnvId}
         onOpenEnvModal={() => setIsEnvModalOpen(true)}
-        onOpenCurlModal={() => setIsCurlModalOpen(true)}
+        onOpenCurlModal={() => setIsImportModalOpen(true)}
         onNewRequest={() => handleCreateRequest()}
         onSaveCurrentRequest={handleSaveRequest}
         onSendRequest={handleSendRequest}
@@ -360,15 +480,21 @@ export const App: React.FC = () => {
 
         {/* Right Editor & Response Workspace */}
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          {/* Multi-Tab Bar */}
+          <TabBar
+            tabs={tabs}
+            activeTabId={activeTabId}
+            onSelectTab={setActiveTabId}
+            onCloseTab={handleCloseTab}
+            onNewTab={handleNewTab}
+          />
+
           {/* Top half: Request Editor */}
           <div className="h-[52%] flex flex-col min-h-[300px]">
             <RequestEditor
               request={currentRequest}
               environment={activeEnvironment}
-              onChange={updated => {
-                setCurrentRequest(updated);
-                setIsDirty(true);
-              }}
+              onChange={handleUpdateRequest}
               onSend={handleSendRequest}
               isSending={isSending}
             />
@@ -390,11 +516,12 @@ export const App: React.FC = () => {
         onDeleteEnvironment={handleDeleteEnvironment}
       />
 
-      {/* cURL Import Modal */}
-      <CurlImportModal
-        isOpen={isCurlModalOpen}
-        onClose={() => setIsCurlModalOpen(false)}
-        onImport={handleImportCurl}
+      {/* Unified Import Modal (cURL / Postman / Swagger) */}
+      <ImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImportSingle={handleImportSingleCurl}
+        onImportBatchCollection={handleImportBatchCollection}
       />
 
       {/* Toast Notification */}

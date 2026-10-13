@@ -5,7 +5,10 @@ import {
   Clock,
   HardDrive,
   Terminal,
-  Zap
+  Zap,
+  Download,
+  Search,
+  X
 } from 'lucide-react';
 import { ResponsePayload } from '../types/api';
 
@@ -18,6 +21,8 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({ response, isSend
   const [activeTab, setActiveTab] = useState<'body' | 'headers' | 'preview'>('body');
   const [viewMode, setViewMode] = useState<'pretty' | 'raw'>('pretty');
   const [copied, setCopied] = useState(false);
+  const [copiedHeaders, setCopiedHeaders] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -32,11 +37,54 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({ response, isSend
     return 'text-rose-400 bg-rose-500/15 border-rose-500/30';
   };
 
+  const getStatusMeaning = (status: number) => {
+    switch (status) {
+      case 200: return 'OK (成功)';
+      case 201: return 'Created (已创建)';
+      case 204: return 'No Content (无内容)';
+      case 301: return 'Moved Permanently (永久重定向)';
+      case 302: return 'Found (临时重定向)';
+      case 304: return 'Not Modified (未修改)';
+      case 400: return 'Bad Request (请求参数错误)';
+      case 401: return 'Unauthorized (未认证)';
+      case 403: return 'Forbidden (禁止访问)';
+      case 404: return 'Not Found (未找到接口)';
+      case 405: return 'Method Not Allowed (方法不被允许)';
+      case 422: return 'Unprocessable Entity (语义错误)';
+      case 429: return 'Too Many Requests (请求过于频繁)';
+      case 500: return 'Internal Server Error (服务端错误)';
+      case 502: return 'Bad Gateway (网关错误)';
+      case 503: return 'Service Unavailable (服务不可用)';
+      case 504: return 'Gateway Timeout (网关超时)';
+      default: return 'HTTP Response';
+    }
+  };
+
   const handleCopy = () => {
     if (!response) return;
     navigator.clipboard.writeText(response.body);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopyHeaders = () => {
+    if (!response) return;
+    const headerStr = response.headers.map(h => `${h.key}: ${h.value}`).join('\n');
+    navigator.clipboard.writeText(headerStr);
+    setCopiedHeaders(true);
+    setTimeout(() => setCopiedHeaders(false), 2000);
+  };
+
+  const handleDownloadResponse = () => {
+    if (!response) return;
+    const ext = response.is_json ? 'json' : 'txt';
+    const blob = new Blob([response.body], { type: response.is_json ? 'application/json' : 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `response_${Date.now()}.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const getFormattedBody = () => {
@@ -115,12 +163,14 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({ response, isSend
         <div className="flex items-center gap-3">
           {/* Status Badge */}
           <div
+            title={getStatusMeaning(response.status)}
             className={`px-2 py-0.5 rounded border font-mono text-xs font-bold flex items-center gap-1.5 ${getStatusColor(
               response.status
             )}`}
           >
             <span>{response.status || 'ERROR'}</span>
             <span>{response.status_text}</span>
+            <span className="text-[10px] opacity-75 font-normal">({getStatusMeaning(response.status)})</span>
           </div>
 
           {/* Time Badge */}
@@ -136,7 +186,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({ response, isSend
           </div>
         </div>
 
-        {/* Right actions: Copy & Modes */}
+        {/* Right actions: Copy & Modes & Download */}
         <div className="flex items-center gap-2">
           {activeTab === 'body' && (
             <div className="flex items-center bg-slate-900 rounded border border-slate-800 p-0.5 text-xs">
@@ -160,11 +210,20 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({ response, isSend
           )}
 
           <button
-            onClick={handleCopy}
+            onClick={handleDownloadResponse}
+            className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 transition-colors"
+            title="下载并保存响应体"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>下载</span>
+          </button>
+
+          <button
+            onClick={activeTab === 'headers' ? handleCopyHeaders : handleCopy}
             className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 transition-colors"
             title="复制响应内容"
           >
-            {copied ? (
+            {(activeTab === 'headers' ? copiedHeaders : copied) ? (
               <>
                 <Check className="w-3.5 h-3.5 text-emerald-400" />
                 <span className="text-emerald-400 text-xs">已复制</span>
@@ -179,7 +238,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({ response, isSend
         </div>
       </div>
 
-      {/* View Tabs */}
+      {/* View Tabs & Search Bar */}
       <div className="flex items-center justify-between px-4 border-b border-slate-800/80 bg-slate-950 text-xs">
         <div className="flex items-center gap-4">
           <button
@@ -217,18 +276,46 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({ response, isSend
           </button>
         </div>
 
-        {activeTab === 'body' && (
-          <span className="text-[11px] font-mono text-slate-500">
-            {lineCount} 行 · {response.is_json ? 'JSON 语法' : '纯文本'}
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {activeTab === 'body' && (
+            <div className="relative flex items-center">
+              <Search className="w-3 h-3 text-slate-500 absolute left-2 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="过滤/查找响应..."
+                className="bg-slate-900 border border-slate-800 rounded pl-6 pr-6 py-0.5 text-[11px] text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 font-mono w-36"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-1.5 text-slate-500 hover:text-slate-300"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'body' && (
+            <span className="text-[11px] font-mono text-slate-500">
+              {lineCount} 行 · {response.is_json ? 'JSON 语法' : '纯文本'}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Response Content Panels */}
       <div className="flex-1 overflow-auto p-3 font-mono text-xs select-text">
         {activeTab === 'body' && (
           <pre className="text-slate-200 leading-relaxed whitespace-pre-wrap break-all font-mono">
-            {formattedBody || '(空响应体)'}
+            {searchQuery
+              ? formattedBody
+                  .split('\n')
+                  .filter(l => l.toLowerCase().includes(searchQuery.toLowerCase()))
+                  .join('\n') || `(未找到包含 "${searchQuery}" 的行)`
+              : formattedBody || '(空响应体)'}
           </pre>
         )}
 
