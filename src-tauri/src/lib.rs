@@ -932,3 +932,166 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_default_workspace() {
+        let path = get_default_workspace();
+        assert!(path.ends_with("tongyun-collections"));
+    }
+
+    #[test]
+    fn test_request_data_serde_roundtrip() {
+        let req = RequestData {
+            id: "req_test_1".to_string(),
+            name: "Test Request".to_string(),
+            method: "POST".to_string(),
+            url: "https://httpbin.org/post".to_string(),
+            headers: vec![KeyValueItem {
+                key: "Content-Type".to_string(),
+                value: "application/json".to_string(),
+                enabled: true,
+                description: None,
+            }],
+            params: vec![KeyValueItem {
+                key: "page".to_string(),
+                value: "1".to_string(),
+                enabled: true,
+                description: Some("page number".to_string()),
+            }],
+            body: RequestBody {
+                body_type: "json".to_string(),
+                content: "{\"key\":\"val\"}".to_string(),
+                form_data: None,
+            },
+            auth: RequestAuth {
+                auth_type: "bearer".to_string(),
+                token: Some("sample-token".to_string()),
+                username: None,
+                password: None,
+                api_key_name: None,
+                api_key_value: None,
+                api_key_in: None,
+            },
+            redirect_policy: Some("safe".to_string()),
+            description: Some("A test request".to_string()),
+        };
+
+        let json_str = serde_json::to_string(&req).unwrap();
+        let deserialized: RequestData = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(deserialized.id, req.id);
+        assert_eq!(deserialized.method, "POST");
+        assert_eq!(deserialized.headers.len(), 1);
+        assert_eq!(deserialized.body.body_type, "json");
+    }
+
+    #[test]
+    fn test_environment_data_serde_roundtrip() {
+        let env = EnvironmentData {
+            id: "dev".to_string(),
+            name: "Development".to_string(),
+            variables: vec![EnvironmentVariable {
+                key: "baseUrl".to_string(),
+                value: "https://httpbin.org".to_string(),
+                enabled: true,
+            }],
+        };
+        let json = serde_json::to_string(&env).unwrap();
+        let parsed: EnvironmentData = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.id, "dev");
+        assert_eq!(parsed.variables[0].key, "baseUrl");
+    }
+
+    #[test]
+    fn test_read_and_save_request_file_json() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("case.json");
+        let path_str = file_path.to_string_lossy().to_string();
+
+        let req = RequestData {
+            id: "req_json".to_string(),
+            name: "JSON Case".to_string(),
+            method: "GET".to_string(),
+            url: "https://httpbin.org/get".to_string(),
+            headers: vec![],
+            params: vec![],
+            body: RequestBody {
+                body_type: "none".to_string(),
+                content: String::new(),
+                form_data: None,
+            },
+            auth: RequestAuth {
+                auth_type: "none".to_string(),
+                token: None,
+                username: None,
+                password: None,
+                api_key_name: None,
+                api_key_value: None,
+                api_key_in: None,
+            },
+            redirect_policy: None,
+            description: None,
+        };
+
+        save_request_file(path_str.clone(), req).unwrap();
+        assert!(file_path.exists());
+
+        let loaded = read_request_file(path_str).unwrap();
+        assert_eq!(loaded.name, "JSON Case");
+        assert_eq!(loaded.method, "GET");
+        assert_eq!(loaded.url, "https://httpbin.org/get");
+    }
+
+    #[test]
+    fn test_read_and_save_request_file_http() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("case.http");
+        let path_str = file_path.to_string_lossy().to_string();
+
+        let req = RequestData {
+            id: "req_http".to_string(),
+            name: "HTTP Case".to_string(),
+            method: "POST".to_string(),
+            url: "https://httpbin.org/post".to_string(),
+            headers: vec![KeyValueItem {
+                key: "X-Test".to_string(),
+                value: "val".to_string(),
+                enabled: true,
+                description: None,
+            }],
+            params: vec![],
+            body: RequestBody {
+                body_type: "json".to_string(),
+                content: "{\"hello\":\"world\"}".to_string(),
+                form_data: None,
+            },
+            auth: RequestAuth {
+                auth_type: "none".to_string(),
+                token: None,
+                username: None,
+                password: None,
+                api_key_name: None,
+                api_key_value: None,
+                api_key_in: None,
+            },
+            redirect_policy: None,
+            description: None,
+        };
+
+        save_request_file(path_str.clone(), req).unwrap();
+        assert!(file_path.exists());
+
+        let loaded = read_request_file(path_str).unwrap();
+        assert_eq!(loaded.name, "case");
+        assert_eq!(loaded.method, "POST");
+        assert_eq!(loaded.url, "https://httpbin.org/post");
+        assert_eq!(loaded.headers.len(), 1);
+        assert_eq!(loaded.headers[0].key, "X-Test");
+        assert_eq!(loaded.headers[0].value, "val");
+        assert_eq!(loaded.body.body_type, "json");
+        assert!(loaded.body.content.contains("hello"));
+    }
+}

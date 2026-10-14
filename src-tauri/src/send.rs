@@ -342,4 +342,58 @@ mod tests {
         }
         String::from_utf8_lossy(&received).into_owned()
     }
+
+    #[test]
+    fn identifies_hop_by_hop_headers_case_insensitively() {
+        assert!(is_hop_by_hop("content-length"));
+        assert!(is_hop_by_hop("Content-Length"));
+        assert!(is_hop_by_hop("HOST"));
+        assert!(is_hop_by_hop("Host"));
+        assert!(is_hop_by_hop("connection"));
+        assert!(is_hop_by_hop("Connection"));
+        assert!(is_hop_by_hop("Transfer-Encoding"));
+        assert!(is_hop_by_hop("keep-alive"));
+        assert!(is_hop_by_hop("Upgrade"));
+        assert!(is_hop_by_hop("TE"));
+        assert!(is_hop_by_hop("Trailer"));
+        assert!(is_hop_by_hop("proxy-connection"));
+
+        assert!(!is_hop_by_hop("Authorization"));
+        assert!(!is_hop_by_hop("Content-Type"));
+        assert!(!is_hop_by_hop("Accept"));
+        assert!(!is_hop_by_hop("X-Requested-With"));
+    }
+
+    #[test]
+    fn validate_accepts_all_standard_http_methods() {
+        for method in &["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"] {
+            assert!(validate(&request(method, "https://httpbin.org/anything")).is_ok());
+        }
+    }
+
+    #[test]
+    fn validate_rejects_unsupported_schemes_and_malformed_urls() {
+        let ftp_err = validate(&request("GET", "ftp://example.com/file")).unwrap_err();
+        assert!(ftp_err.contains("只发送 http 和 https"));
+
+        let ws_err = validate(&request("GET", "ws://example.com/socket")).unwrap_err();
+        assert!(ws_err.contains("只发送 http 和 https"));
+
+        let bad_url_err = validate(&request("GET", "not-a-valid-url")).unwrap_err();
+        assert!(bad_url_err.contains("无法解析地址"));
+
+        let empty_url_err = validate(&request("GET", "")).unwrap_err();
+        assert!(empty_url_err.contains("无法解析地址"));
+    }
+
+    #[test]
+    fn header_pair_serde_roundtrip() {
+        let pair = HeaderPair {
+            name: "X-Trace-Id".to_string(),
+            value: "trace-123".to_string(),
+        };
+        let serialized = serde_json::to_string(&pair).unwrap();
+        let deserialized: HeaderPair = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(pair, deserialized);
+    }
 }
