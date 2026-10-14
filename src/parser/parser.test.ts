@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import basicsText from "../../examples/httpbin/basics.http?raw";
 import methodsText from "../../examples/httpbin/methods.http?raw";
+import headersAuthText from "../../examples/httpbin/headers-auth.http?raw";
+import jsonBodyText from "../../examples/httpbin/json-body.http?raw";
+import variablesText from "../../examples/httpbin/variables.http?raw";
 import envText from "../../examples/http-client.env.json?raw";
 import { mergeEnvironmentLayers } from "./env";
 import { parseHttpFile } from "./httpFile";
@@ -256,6 +259,49 @@ describe("examples", () => {
     }
     const local = resolveRequest(basics.requests[0], merged.variables.local);
     expect(local.url.startsWith("http://127.0.0.1:8080/")).toBe(true);
+  });
+
+  it("parses additional httpbin samples (headers-auth, json-body, variables) against public env", () => {
+    const merged = mergeEnvironmentLayers([
+      {
+        path: "http-client.env.json",
+        kind: "public",
+        content: envText,
+      },
+    ]);
+    const headersAuth = parseHttpFile(headersAuthText);
+    const jsonBody = parseHttpFile(jsonBodyText);
+    const variables = parseHttpFile(variablesText);
+
+    expect(headersAuth.warnings).toEqual([]);
+    expect(jsonBody.warnings).toEqual([]);
+    expect(variables.warnings).toEqual([]);
+
+    expect(headersAuth.requests.map((r) => r.name)).toEqual([
+      "Bearer 令牌鉴权",
+      "自定义请求头回显",
+      "基本鉴权测试",
+    ]);
+    expect(jsonBody.requests.map((r) => r.name)).toEqual([
+      "创建资源 (POST)",
+      "替换资源 (PUT)",
+      "局部更新 (PATCH)",
+    ]);
+    expect(variables.requests.map((r) => r.name)).toEqual([
+      "嵌套变量与查询参数",
+      "请求体多处插值",
+      "状态码路径参数",
+    ]);
+
+    for (const request of [
+      ...headersAuth.requests,
+      ...jsonBody.requests,
+      ...variables.requests,
+    ]) {
+      const resolved = resolveRequest(request, merged.variables.httpbin);
+      expect(resolved.missing, request.name).toEqual([]);
+      expect(resolved.url.startsWith("https://httpbin.org/"), request.name).toBe(true);
+    }
   });
 
   it("resolves dynamic system variables when resolveDynamic is enabled", () => {
