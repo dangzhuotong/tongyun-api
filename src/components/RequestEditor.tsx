@@ -11,7 +11,6 @@ import {
   CheckSquare,
   Variable,
   Sparkles,
-  Bot,
   Settings,
   Upload,
   FileUp,
@@ -22,7 +21,8 @@ import {
   CheckCircle2,
   XCircle,
   RotateCcw,
-  Download
+  Download,
+  SendHorizontal
 } from 'lucide-react';
 import {
   RequestData,
@@ -73,8 +73,6 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
   const [activeTab, setActiveTab] = useState<'params' | 'headers' | 'auth' | 'body' | 'cases' | 'tests' | 'docs' | 'settings'>('params');
   const [copiedCurl, setCopiedCurl] = useState(false);
   const [jsonError, setJsonError] = useState<string | null>(null);
-  const [aiPromptInput, setAiPromptInput] = useState('');
-  const [isTemplateMenuOpen, setIsTemplateMenuOpen] = useState(false);
   const [isVarMenuOpen, setIsVarMenuOpen] = useState(false);
 
   // 测试用例集状态
@@ -99,183 +97,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
     setIsVarMenuOpen(false);
   };
 
-  // 常见接口一键模板
-  const AI_TEMPLATES = [
-    {
-      label: '🔑 用户登录鉴权',
-      data: {
-        name: '用户登录鉴权',
-        method: 'POST' as HttpMethod,
-        url: 'https://httpbin.org/post',
-        headers: [{ key: 'Content-Type', value: 'application/json', enabled: true }],
-        params: [],
-        body: {
-          body_type: 'json' as BodyType,
-          content: JSON.stringify({ username: 'admin', password: 'password123', client: 'web' }, null, 2),
-        },
-        auth: { auth_type: 'none' as const },
-        tests: [
-          { id: 't1', name: '状态码为 200', type: 'status_equals' as const, expected: '200', enabled: true },
-          { id: 't2', name: '响应耗时 <= 1000ms', type: 'time_less_than' as const, expected: '1000', enabled: true },
-        ],
-        extracts: [
-          { id: 'e1', var_name: 'token', source: 'json' as const, path_or_key: 'json.client', enabled: true },
-        ],
-      },
-    },
-    {
-      label: '📎 Multipart 文件上传',
-      data: {
-        name: '表单与文件附件上传',
-        method: 'POST' as HttpMethod,
-        url: 'https://httpbin.org/post',
-        headers: [],
-        params: [],
-        body: {
-          body_type: 'form-data' as BodyType,
-          content: '',
-          form_data: [
-            { key: 'username', value: 'tongyun_dev', type: 'text' as const, enabled: true, description: '文本字段' },
-            { key: 'avatar', value: 'avatar.png', type: 'file' as const, enabled: true, description: '二进制文件附件' },
-          ],
-        },
-        auth: { auth_type: 'none' as const },
-        tests: [
-          { id: 't1', name: '状态码为 200', type: 'status_equals' as const, expected: '200', enabled: true },
-        ],
-        extracts: [],
-      },
-    },
-    {
-      label: '📡 WebSocket 实时通道',
-      data: {
-        name: 'WebSocket 实时测试',
-        method: 'WS' as HttpMethod,
-        url: 'wss://echo.websocket.events',
-        headers: [],
-        params: [],
-        body: { body_type: 'none' as BodyType, content: '' },
-        auth: { auth_type: 'none' as const },
-        tests: [],
-        extracts: [],
-      },
-    },
-    {
-      label: '📦 创建业务订单',
-      data: {
-        name: '创建业务订单',
-        method: 'POST' as HttpMethod,
-        url: 'https://httpbin.org/post',
-        headers: [
-          { key: 'Content-Type', value: 'application/json', enabled: true },
-          { key: 'Authorization', value: 'Bearer {{token}}', enabled: true },
-        ],
-        params: [],
-        body: {
-          body_type: 'json' as BodyType,
-          content: JSON.stringify(
-            {
-              orderNo: '{{$uuid}}',
-              amount: 199.9,
-              currency: 'CNY',
-              items: [{ productId: 'P1001', quantity: 2, price: 99.95 }],
-            },
-            null,
-            2
-          ),
-        },
-        auth: { auth_type: 'bearer' as const, token: '{{token}}' },
-        tests: [
-          { id: 't1', name: '状态码为 200', type: 'status_equals' as const, expected: '200', enabled: true },
-        ],
-      },
-    },
-    {
-      label: '🔍 分页查询列表',
-      data: {
-        name: '分页查询列表',
-        method: 'GET' as HttpMethod,
-        url: 'https://httpbin.org/get',
-        headers: [{ key: 'Accept', value: 'application/json', enabled: true }],
-        params: [
-          { key: 'page', value: '1', enabled: true, description: '当前页码' },
-          { key: 'pageSize', value: '20', enabled: true, description: '每页条数' },
-          { key: 'keyword', value: 'tongyun', enabled: true, description: '检索词' },
-        ],
-        body: { body_type: 'none' as BodyType, content: '' },
-        auth: { auth_type: 'none' as const },
-        tests: [
-          { id: 't1', name: '状态码为 200', type: 'status_equals' as const, expected: '200', enabled: true },
-        ],
-      },
-    },
-    {
-      label: '❤️ 健康检查探测',
-      data: {
-        name: '健康检查探测',
-        method: 'GET' as HttpMethod,
-        url: 'https://httpbin.org/status/200',
-        headers: [],
-        params: [],
-        body: { body_type: 'none' as BodyType, content: '' },
-        auth: { auth_type: 'none' as const },
-        tests: [
-          { id: 't1', name: '健康状态码 200', type: 'status_equals' as const, expected: '200', enabled: true },
-          { id: 't2', name: '延迟 <= 500ms', type: 'time_less_than' as const, expected: '500', enabled: true },
-        ],
-      },
-    },
-  ];
 
-  const handleApplyAiTemplate = (tpl: any) => {
-    onChange({
-      ...request,
-      ...tpl.data,
-      id: request.id,
-      name: tpl.data.name,
-    });
-    if (onToast) onToast(`✨ AI 已自动填入接口结构: ${tpl.data.name}`);
-  };
-
-  const handleAiPromptGenerate = () => {
-    const p = aiPromptInput.trim();
-    if (!p) return;
-
-    let inferredMethod: HttpMethod = 'GET';
-    if (p.includes('创建') || p.includes('添加') || p.includes('登录') || p.includes('提交') || p.toLowerCase().includes('post')) {
-      inferredMethod = 'POST';
-    } else if (p.includes('修改') || p.includes('更新') || p.toLowerCase().includes('put')) {
-      inferredMethod = 'PUT';
-    } else if (p.includes('删除') || p.toLowerCase().includes('delete')) {
-      inferredMethod = 'DELETE';
-    }
-
-    const newReq: RequestData = {
-      ...request,
-      name: p,
-      method: inferredMethod,
-      url: inferredMethod === 'GET' ? 'https://httpbin.org/get' : 'https://httpbin.org/post',
-      headers:
-        inferredMethod !== 'GET'
-          ? [{ key: 'Content-Type', value: 'application/json', enabled: true }]
-          : [{ key: 'Accept', value: 'application/json', enabled: true }],
-      params: inferredMethod === 'GET' ? [{ key: 'keyword', value: p, enabled: true }] : [],
-      body:
-        inferredMethod !== 'GET'
-          ? {
-              body_type: 'json',
-              content: JSON.stringify({ title: p, timestamp: '{{$timestamp}}' }, null, 2),
-            }
-          : { body_type: 'none', content: '' },
-      tests: [
-        { id: `test_${Date.now()}`, name: '状态码为 200', type: 'status_equals', expected: '200', enabled: true },
-      ],
-    };
-
-    onChange(newReq);
-    setAiPromptInput('');
-    if (onToast) onToast(`✨ AI 已根据需求 "${p}" 自动生成并填入所有接口字段`);
-  };
 
   // 格式化 JSON
   const handlePrettifyJson = () => {
@@ -594,140 +416,6 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-[var(--ty-bg)] overflow-hidden border-b border-[var(--ty-border)]">
-      {/* IntelliJ Action Strip: Template Selector & AI Quick Fill */}
-      <div className="h-8 bg-[var(--ty-nav-bg)]/50 border-b border-[var(--ty-border)] px-3 text-xs flex items-center justify-between gap-3 shrink-0 select-none">
-        <div className="flex items-center gap-2">
-          {/* Templates Dropdown Button */}
-          <div className="relative">
-            <button
-              onClick={() => setIsTemplateMenuOpen(!isTemplateMenuOpen)}
-              className="flex items-center gap-1.5 px-2 py-0.5 rounded-[var(--ty-radius-xs,4px)] bg-white/80 dark:bg-[var(--ty-surface)] hover:bg-white border border-[var(--ty-border)] text-xs text-[var(--ty-text)] shadow-2xs transition-all cursor-pointer"
-              title="常用接口结构与用例模板"
-            >
-              <Sparkles className="w-3 h-3 text-[var(--ty-honey)]" />
-              <span className="text-[11px] font-medium">快速模板</span>
-              <ChevronDown className="w-3 h-3 text-[var(--ty-text-subtle)]" />
-            </button>
-
-            {isTemplateMenuOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-30"
-                  onClick={() => setIsTemplateMenuOpen(false)}
-                />
-                <div className="absolute left-0 top-full mt-1 w-56 py-1 bg-[var(--ty-surface-raised)] border border-[var(--ty-border)] rounded-[var(--ty-radius-sm)] shadow-[var(--ty-shadow-pop)] z-40">
-                  <div className="px-2.5 py-1 text-[10px] text-[var(--ty-text-subtle)] font-mono uppercase tracking-wider border-b border-[var(--ty-border)]/60">
-                    一键载入场景模板
-                  </div>
-                  {AI_TEMPLATES.map((tpl, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => {
-                        handleApplyAiTemplate(tpl);
-                        setIsTemplateMenuOpen(false);
-                      }}
-                      className="w-full text-left px-3 py-1.5 hover:bg-[var(--ty-surface)] text-xs text-[var(--ty-text)] hover:text-[var(--ty-matcha)] flex items-center gap-2 transition-colors"
-                    >
-                      <span>{tpl.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Variables Helper Dropdown Button */}
-          <div className="relative">
-            <button
-              onClick={() => setIsVarMenuOpen(!isVarMenuOpen)}
-              className="flex items-center gap-1.5 px-2 py-0.5 rounded-[var(--ty-radius-xs,4px)] bg-white/80 dark:bg-[var(--ty-surface)] hover:bg-white border border-[var(--ty-border)] text-xs text-[var(--ty-text)] shadow-2xs transition-all cursor-pointer"
-              title="查看与复制当前环境变量及 IntelliJ 动态变量"
-            >
-              <Variable className="w-3 h-3 text-[var(--ty-matcha)]" />
-              <span className="text-[11px] font-medium">变量助手</span>
-              <ChevronDown className="w-3 h-3 text-[var(--ty-text-subtle)]" />
-            </button>
-
-            {isVarMenuOpen && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setIsVarMenuOpen(false)} />
-                <div className="absolute left-0 top-full mt-1 w-64 py-1.5 bg-[var(--ty-surface-raised)] border border-[var(--ty-border)] rounded-[var(--ty-radius-sm)] shadow-[var(--ty-shadow-pop)] z-40 max-h-72 overflow-y-auto">
-                  {/* Active environment vars */}
-                  <div className="px-2.5 py-1 text-[10px] text-[var(--ty-text-subtle)] font-mono uppercase tracking-wider border-b border-[var(--ty-border)]/60 flex items-center justify-between">
-                    <span>环境变量 ({environment?.name || '默认'})</span>
-                    <span className="text-[9px] text-[var(--ty-matcha)]">点击复制</span>
-                  </div>
-                  {(!environment || !environment.variables || environment.variables.length === 0) ? (
-                    <div className="px-3 py-1.5 text-[11px] text-[var(--ty-text-subtle)]">
-                      暂无自定义环境变量 (可在右上角配置)
-                    </div>
-                  ) : (
-                    environment.variables.filter(v => v.enabled).map((v, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => handleInsertVariable(`{{${v.key}}}`)}
-                        className="w-full text-left px-3 py-1 hover:bg-[var(--ty-surface)] text-xs flex items-center justify-between group transition-colors"
-                      >
-                        <span className="font-mono text-[var(--ty-matcha)] text-[11px]">{"{{" + v.key + "}}"}</span>
-                        <span className="text-[10px] font-mono text-[var(--ty-text-subtle)] truncate max-w-[90px]">{v.value}</span>
-                      </button>
-                    ))
-                  )}
-
-                  {/* Dynamic variables */}
-                  <div className="px-2.5 py-1 text-[10px] text-[var(--ty-text-subtle)] font-mono uppercase tracking-wider border-t border-b border-[var(--ty-border)]/60 mt-1">
-                    IntelliJ 标准动态变量
-                  </div>
-                  {DYNAMIC_VARIABLES_GUIDE.map((dyn, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleInsertVariable(dyn.tag)}
-                      className="w-full text-left px-3 py-1.5 hover:bg-[var(--ty-surface)] text-xs flex items-center justify-between group transition-colors"
-                    >
-                      <div>
-                        <div className="font-mono text-[var(--ty-honey)] text-[11px] font-medium">{dyn.tag}</div>
-                        <div className="text-[10px] text-[var(--ty-text-subtle)]">{dyn.desc}</div>
-                      </div>
-                      <span className="text-[9px] font-mono text-[var(--ty-text-muted)] opacity-60 group-hover:opacity-100">
-                        复制
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-
-          <div className="h-3 w-[1px] bg-[var(--ty-border)]" />
-
-          {/* AI Intent Input */}
-          <div className="flex items-center gap-1">
-            <input
-              type="text"
-              value={aiPromptInput}
-              onChange={e => setAiPromptInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAiPromptGenerate()}
-              placeholder="告诉 AI 要测什么 (如: 微信退款、发送验证码)..."
-              className="bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] rounded-[var(--ty-radius-xs,4px)] px-2 py-0.5 text-[11px] text-[var(--ty-text)] placeholder-[var(--ty-text-subtle)] outline-none focus:border-[var(--ty-matcha)] w-56 font-mono"
-            />
-            <button
-              onClick={handleAiPromptGenerate}
-              disabled={!aiPromptInput.trim()}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-[var(--ty-text-muted)] hover:text-[var(--ty-matcha)] text-[11px] transition-colors disabled:opacity-40"
-            >
-              <Bot className="w-3 h-3 text-[var(--ty-matcha)]" />
-              <span>生成</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 text-[11px] font-mono text-[var(--ty-text-subtle)]">
-          <span>HTTP/1.1</span>
-          <span>·</span>
-          <span>UTF-8</span>
-        </div>
-      </div>
-
       {/* Unified IDE Address Omnibar */}
       <div className="p-2.5 bg-[var(--ty-nav-bg)]/35 border-b border-[var(--ty-border)] flex items-center gap-2">
         <div className="flex-1 flex items-center bg-white dark:bg-[var(--ty-surface)] border border-[var(--ty-border)] rounded-lg focus-within:border-[var(--ty-matcha)] focus-within:ring-2 focus-within:ring-[var(--ty-matcha)]/15 transition-all overflow-hidden h-8.5 shadow-xs pl-1 pr-1.5">
@@ -782,7 +470,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
             {request.method !== 'WS' && (
               <button
                 onClick={handleCopyCurl}
-                className="ty-btn-ghost ty-pressable flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors"
+                className="ty-btn-ghost ty-pressable flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors cursor-pointer"
                 title="复制为完整 cURL 命令"
               >
                 {copiedCurl ? (
@@ -802,38 +490,103 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
             {onOpenCodeSnippet && request.method !== 'WS' && (
               <button
                 onClick={onOpenCodeSnippet}
-                className="ty-btn-ghost ty-pressable flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors"
+                className="ty-btn-ghost ty-pressable flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors cursor-pointer"
                 title="生成多语言客户端调用代码 (JS/Python/Go/Rust等)"
               >
                 <Code2 className="w-3 h-3 text-[var(--ty-sky)]" />
                 <span>代码</span>
               </button>
             )}
+
+            {/* Variables Helper Dropdown Button */}
+            <div className="relative">
+              <button
+                onClick={() => setIsVarMenuOpen(!isVarMenuOpen)}
+                className="ty-btn-ghost ty-pressable flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors cursor-pointer"
+                title="查看当前环境变量与 IntelliJ 动态变量"
+              >
+                <Variable className="w-3 h-3 text-[var(--ty-matcha)]" />
+                <span>变量</span>
+              </button>
+
+              {isVarMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setIsVarMenuOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 w-64 py-1.5 bg-[var(--ty-surface-raised)] border border-[var(--ty-border)] rounded-[var(--ty-radius-sm)] shadow-[var(--ty-shadow-pop)] z-40 max-h-72 overflow-y-auto">
+                    {/* Active environment vars */}
+                    <div className="px-2.5 py-1 text-[10px] text-[var(--ty-text-subtle)] font-mono uppercase tracking-wider border-b border-[var(--ty-border)]/60 flex items-center justify-between">
+                      <span>环境变量 ({environment?.name || '默认'})</span>
+                      <span className="text-[9px] text-[var(--ty-matcha)]">点击复制</span>
+                    </div>
+                    {(!environment || !environment.variables || environment.variables.length === 0) ? (
+                      <div className="px-3 py-1.5 text-[11px] text-[var(--ty-text-subtle)]">
+                        暂无自定义环境变量
+                      </div>
+                    ) : (
+                      environment.variables.filter(v => v.enabled).map((v, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => handleInsertVariable(`{{${v.key}}}`)}
+                          className="w-full text-left px-3 py-1 hover:bg-[var(--ty-surface)] text-xs flex items-center justify-between group transition-colors cursor-pointer"
+                        >
+                          <span className="font-mono text-[var(--ty-matcha)] text-[11px]">{"{{" + v.key + "}}"}</span>
+                          <span className="text-[10px] font-mono text-[var(--ty-text-subtle)] truncate max-w-[90px]">{v.value}</span>
+                        </button>
+                      ))
+                    )}
+
+                    {/* Dynamic variables */}
+                    <div className="px-2.5 py-1 text-[10px] text-[var(--ty-text-subtle)] font-mono uppercase tracking-wider border-t border-b border-[var(--ty-border)]/60 mt-1">
+                      IntelliJ 标准动态变量
+                    </div>
+                    {DYNAMIC_VARIABLES_GUIDE.map((dyn, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleInsertVariable(dyn.tag)}
+                        className="w-full text-left px-3 py-1.5 hover:bg-[var(--ty-surface)] text-xs flex items-center justify-between group transition-colors cursor-pointer"
+                      >
+                        <div>
+                          <div className="font-mono text-[var(--ty-honey)] text-[11px] font-medium">{dyn.tag}</div>
+                          <div className="text-[10px] text-[var(--ty-text-subtle)]">{dyn.desc}</div>
+                        </div>
+                        <span className="text-[9px] font-mono text-[var(--ty-text-muted)] opacity-60 group-hover:opacity-100">
+                          复制
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Send / WS Indicator Button */}
         {request.method === 'WS' ? (
-          <div className="flex items-center gap-1.5 px-3 h-8.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-mono select-none shrink-0">
-            <Radio className="w-3 h-3 animate-pulse" />
-            <span className="text-[11px]">WS 模式</span>
+          <div className="flex items-center gap-1.5 px-3 h-8.5 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-800 dark:text-emerald-300 text-xs font-mono select-none shrink-0">
+            <Radio className="w-3 h-3 animate-pulse text-emerald-600 dark:text-emerald-400" />
+            <span className="text-[11px] font-medium">WS 模式</span>
           </div>
         ) : (
           <button
             onClick={onSend}
             disabled={isSending}
-            className="ty-btn-primary flex items-center gap-2 px-3.5 h-8.5 rounded-lg text-xs font-medium shadow-xs active:scale-95 transition-all disabled:opacity-50 shrink-0"
+            className="ty-btn-send group flex items-center gap-2 px-3.5 h-8.5 rounded-lg text-xs select-none shrink-0"
             title="发送请求 (Ctrl+Enter)"
           >
             {isSending ? (
               <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
             ) : (
-              <Play className="w-3.5 h-3.5 fill-white text-white" />
+              <SendHorizontal className="w-3.5 h-3.5 text-white/90 group-hover:translate-x-0.5 transition-transform duration-150" />
             )}
-            <span className="text-xs font-medium tracking-tight">{isSending ? '请求中...' : '发送'}</span>
-            <span className="hidden sm:inline-flex items-center text-[9px] font-mono px-1 py-0.2 rounded bg-white/20 text-white leading-none">
-              Ctrl+↵
+            <span className="font-semibold tracking-wider text-white text-xs">
+              {isSending ? '发送中...' : '发送'}
             </span>
+            <div className="hidden sm:flex items-center pl-1.5 ml-0.5 border-l border-white/25">
+              <span className="text-[10px] font-mono text-white/70 tracking-tight font-normal">
+                Ctrl ↵
+              </span>
+            </div>
           </button>
         )}
       </div>

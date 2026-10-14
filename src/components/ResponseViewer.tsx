@@ -12,9 +12,7 @@ import {
   XCircle,
   Variable,
   CheckSquare,
-  Bot,
-  Zap,
-  Activity
+  Zap
 } from 'lucide-react';
 import { ResponsePayload, RequestData, HistoryItem } from '../types/api';
 import { ResponseDiffViewer } from './ResponseDiffViewer';
@@ -92,39 +90,14 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
   previousResponse,
   history = [],
   isSending,
-  currentRequest,
-  onCopyAiPrompt,
 }) => {
-  const [activeTab, setActiveTab] = useState<'body' | 'headers' | 'tests' | 'timing' | 'diff' | 'preview'>('body');
+  const [activeTab, setActiveTab] = useState<'body' | 'headers' | 'tests' | 'diff' | 'preview'>('body');
   const [viewMode, setViewMode] = useState<'pretty' | 'raw'>('pretty');
   const [copied, setCopied] = useState(false);
   const [copiedHeaders, setCopiedHeaders] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [headerFilter, setHeaderFilter] = useState('');
   const [copiedHeaderIdx, setCopiedHeaderIdx] = useState<number | null>(null);
-
-  const timingBreakdown = useMemo(() => {
-    if (!response) return null;
-    const total = Math.max(1, response.time_ms);
-    const dns = Math.max(1, Math.round(total * 0.08));
-    const tcp = Math.max(1, Math.round(total * 0.14));
-    const tls = Math.max(1, Math.round(total * 0.22));
-    const ttfb = Math.max(1, Math.round(total * 0.48));
-    const download = Math.max(1, total - (dns + tcp + tls + ttfb));
-    return {
-      total,
-      dns,
-      tcp,
-      tls,
-      ttfb,
-      download,
-      dnsPct: Math.max(3, Math.round((dns / total) * 100)),
-      tcpPct: Math.max(4, Math.round((tcp / total) * 100)),
-      tlsPct: Math.max(5, Math.round((tls / total) * 100)),
-      ttfbPct: Math.max(8, Math.round((ttfb / total) * 100)),
-      downloadPct: Math.max(3, Math.round((download / total) * 100)),
-    };
-  }, [response]);
 
   const formattedBody = useMemo(() => {
     if (!response) return '';
@@ -228,8 +201,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
         <div className="relative mb-3">
           <div className="w-10 h-10 rounded-full border-2 border-[var(--ty-matcha)]/20 border-t-[var(--ty-matcha)] animate-spin" />
         </div>
-        <div className="text-xs font-medium text-[var(--ty-text)]">正在发送 HTTP 请求...</div>
-        <p className="text-[11px] text-[var(--ty-text-subtle)] mt-1 font-mono">Rust 原生 reqwest 引擎直连</p>
+        <div className="text-xs font-medium text-[var(--ty-text)]">正在发送请求...</div>
       </div>
     );
   }
@@ -285,25 +257,13 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
             )}`}
           >
             <span>{response.status || 'ERROR'}</span>
-            <span>{response.status_text}</span>
-            <span className="text-[10px] opacity-75 font-normal">({getStatusMeaning(response.status)})</span>
+            {response.status_text && <span>{response.status_text}</span>}
           </div>
 
-          {/* Time Badge with Speed Indicator */}
+          {/* Time Badge */}
           <div className="ty-pressable flex items-center gap-1.5 text-[11px] font-mono text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors cursor-default" title="网络往返耗时 (RTT)">
             <Clock className="w-3 h-3 text-[var(--ty-text-subtle)]" />
             <span>{response.time_ms} ms</span>
-            <span
-              className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-medium ${
-                response.time_ms < 300
-                  ? 'bg-[var(--ty-matcha-tint)] text-[var(--ty-matcha)] border border-[var(--ty-matcha-soft)]'
-                  : response.time_ms < 1000
-                  ? 'bg-[var(--ty-honey-tint)] text-[var(--ty-honey)] border border-[var(--ty-honey-soft)]'
-                  : 'bg-[var(--ty-peach-tint)] text-[var(--ty-peach)] border border-[var(--ty-peach-soft)]'
-              }`}
-            >
-              {response.time_ms < 300 ? '极速' : response.time_ms < 1000 ? '正常' : '较慢'}
-            </span>
           </div>
 
           {/* Size Badge */}
@@ -364,20 +324,9 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
             </div>
           )}
 
-          {onCopyAiPrompt && (
-            <button
-              onClick={onCopyAiPrompt}
-              className="ty-btn-ghost ty-pressable flex items-center gap-1 px-2 py-1 rounded-md text-xs text-[var(--ty-text)] hover:text-[var(--ty-matcha)] font-medium transition-all"
-              title={`复制 ${currentRequest?.name || '当前接口'} 的 AI 诊断 Prompt`}
-            >
-              <Bot className="w-3.5 h-3.5 text-[var(--ty-matcha)]" />
-              <span className="text-[11px]">AI 诊断</span>
-            </button>
-          )}
-
           <button
             onClick={handleDownloadResponse}
-            className="ty-btn-ghost ty-pressable flex items-center gap-1 px-2 py-1 rounded-md text-xs text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-all"
+            className="ty-btn-ghost ty-pressable flex items-center gap-1 px-2 py-1 rounded-md text-xs text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-all cursor-pointer"
             title="下载并保存响应体"
           >
             <Download className="w-3.5 h-3.5" />
@@ -386,7 +335,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
 
           <button
             onClick={activeTab === 'headers' ? handleCopyHeaders : handleCopy}
-            className="ty-btn-ghost ty-pressable flex items-center gap-1 px-2 py-1 rounded-md text-xs text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-all"
+            className="ty-btn-ghost ty-pressable flex items-center gap-1 px-2 py-1 rounded-md text-xs text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-all cursor-pointer"
             title="复制响应内容"
           >
             {(activeTab === 'headers' ? copiedHeaders : copied) ? (
@@ -408,11 +357,10 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
       <div className="h-8.5 flex items-center justify-between px-3 border-b border-[var(--ty-border)] bg-[var(--ty-nav-bg)]/40 text-xs">
         <div className="flex items-center gap-1 h-full">
           {[
-            { id: 'body', label: '正文 (Body)' },
-            { id: 'headers', label: '响应头 (Headers)', count: response.headers.length },
-            { id: 'tests', label: '断言与提取结果', badge: response.test_results?.length ? `${response.test_results.filter(t => t.passed).length}/${response.test_results.length}` : undefined },
-            { id: 'timing', label: '时序瀑布 (Timing)' },
-            { id: 'diff', label: '双响应对比 (Diff)', badge: previousResponse ? '有基准' : undefined },
+            { id: 'body', label: '正文' },
+            { id: 'headers', label: '响应头', count: response.headers.length },
+            { id: 'tests', label: '断言', badge: response.test_results?.length ? `${response.test_results.filter(t => t.passed).length}/${response.test_results.length}` : undefined },
+            { id: 'diff', label: '响应对比', badge: previousResponse ? '有基准' : undefined },
             { id: 'preview', label: 'HTML 预览' },
           ].map(tab => (
             <button
@@ -712,115 +660,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
           </div>
         )}
 
-        {activeTab === 'timing' && timingBreakdown && (
-          <div className="p-4 space-y-4 max-w-3xl animate-fade-in">
-            {/* Waterfall Summary Cards */}
-            <div className="grid grid-cols-4 gap-2.5">
-              <div className="p-3 rounded-[var(--ty-radius-sm)] bg-[var(--ty-surface)] border border-[var(--ty-border)] ty-pressable hover:border-[var(--ty-matcha)]/40 hover:shadow-xs transition-all">
-                <span className="text-[10px] text-[var(--ty-text-subtle)] block uppercase font-mono tracking-wider">总耗时 DURATION</span>
-                <span className="text-base font-bold font-mono text-[var(--ty-matcha)] mt-0.5 block">{response.time_ms} ms</span>
-                <span className="text-[10px] text-[var(--ty-text-subtle)] mt-0.5 block">
-                  {response.time_ms < 300 ? '⚡ 极速响应' : response.time_ms < 1000 ? '✨ 正常时延' : '🐢 较慢'}
-                </span>
-              </div>
-              <div className="p-3 rounded-[var(--ty-radius-sm)] bg-[var(--ty-surface)] border border-[var(--ty-border)] ty-pressable hover:border-[var(--ty-border-strong)] hover:shadow-xs transition-all">
-                <span className="text-[10px] text-[var(--ty-text-subtle)] block uppercase font-mono tracking-wider">传输体积 SIZE</span>
-                <span className="text-base font-bold font-mono text-[var(--ty-text)] mt-0.5 block">{formatSize(response.size_bytes)}</span>
-                <span className="text-[10px] text-[var(--ty-text-subtle)] mt-0.5 block">{response.size_bytes} 字节</span>
-              </div>
-              <div className="p-3 rounded-[var(--ty-radius-sm)] bg-[var(--ty-surface)] border border-[var(--ty-border)] ty-pressable hover:border-[var(--ty-sky)]/40 hover:shadow-xs transition-all">
-                <span className="text-[10px] text-[var(--ty-text-subtle)] block uppercase font-mono tracking-wider">估算吞吐量 RATE</span>
-                <span className="text-base font-bold font-mono text-[var(--ty-sky)] mt-0.5 block">
-                  {response.time_ms > 0 ? (response.size_bytes / (response.time_ms / 1000) / 1024).toFixed(1) : '0'} KB/s
-                </span>
-                <span className="text-[10px] text-[var(--ty-text-subtle)] mt-0.5 block">网络吞吐速率</span>
-              </div>
-              <div className="p-3 rounded-[var(--ty-radius-sm)] bg-[var(--ty-surface)] border border-[var(--ty-border)] ty-pressable hover:border-[var(--ty-honey)]/40 hover:shadow-xs transition-all">
-                <span className="text-[10px] text-[var(--ty-text-subtle)] block uppercase font-mono tracking-wider">底层引擎 ENGINE</span>
-                <span className="text-xs font-bold font-mono text-[var(--ty-honey)] mt-1 block">Rust reqwest</span>
-                <span className="text-[10px] text-[var(--ty-text-subtle)] mt-0.5 block">rustls 原生直连</span>
-              </div>
-            </div>
 
-            {/* Visual Waterfall Timeline Bar */}
-            <div className="p-3 rounded-[var(--ty-radius-sm)] bg-[var(--ty-surface)] border border-[var(--ty-border)] space-y-2.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-[var(--ty-text)] flex items-center gap-1.5">
-                  <Activity className="w-3.5 h-3.5 text-[var(--ty-matcha)]" />
-                  <span>网络生命周期时序瀑布 (Network Waterfall)</span>
-                </span>
-                <span className="text-[10px] font-mono text-[var(--ty-text-subtle)]">100% 比例可视化</span>
-              </div>
-
-              {/* Progress segments bar with smooth expansion */}
-              <div className="h-4 w-full rounded-full overflow-hidden flex bg-[var(--ty-surface-sunken)] p-0.5 gap-0.5 border border-[var(--ty-border)]">
-                <div style={{ width: `${timingBreakdown.dnsPct}%` }} className="bg-sky-400 rounded-l-full h-full transition-all duration-700 ease-out" title={`DNS: ${timingBreakdown.dns}ms (${timingBreakdown.dnsPct}%)`} />
-                <div style={{ width: `${timingBreakdown.tcpPct}%` }} className="bg-indigo-400 h-full transition-all duration-700 ease-out" title={`TCP: ${timingBreakdown.tcp}ms (${timingBreakdown.tcpPct}%)`} />
-                <div style={{ width: `${timingBreakdown.tlsPct}%` }} className="bg-purple-400 h-full transition-all duration-700 ease-out" title={`TLS: ${timingBreakdown.tls}ms (${timingBreakdown.tlsPct}%)`} />
-                <div style={{ width: `${timingBreakdown.ttfbPct}%` }} className="bg-amber-400 h-full transition-all duration-700 ease-out" title={`TTFB: ${timingBreakdown.ttfb}ms (${timingBreakdown.ttfbPct}%)`} />
-                <div style={{ width: `${timingBreakdown.downloadPct}%` }} className="bg-emerald-400 rounded-r-full h-full transition-all duration-700 ease-out" title={`Download: ${timingBreakdown.download}ms (${timingBreakdown.downloadPct}%)`} />
-              </div>
-
-              {/* Detailed Breakdown Rows */}
-              <div className="divide-y divide-[var(--ty-border)]/40 pt-1 text-xs">
-                <div className="py-2 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-sky-400" />
-                    <span className="text-[var(--ty-text)]">DNS 域名解析 (DNS Lookup)</span>
-                  </div>
-                  <div className="flex items-center gap-3 font-mono">
-                    <span className="text-[var(--ty-text-subtle)] text-[11px]">{timingBreakdown.dnsPct}%</span>
-                    <span className="text-[var(--ty-text)] font-semibold w-16 text-right">{timingBreakdown.dns} ms</span>
-                  </div>
-                </div>
-
-                <div className="py-2 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-indigo-400" />
-                    <span className="text-[var(--ty-text)]">TCP 连接握手 (Initial Connection)</span>
-                  </div>
-                  <div className="flex items-center gap-3 font-mono">
-                    <span className="text-[var(--ty-text-subtle)] text-[11px]">{timingBreakdown.tcpPct}%</span>
-                    <span className="text-[var(--ty-text)] font-semibold w-16 text-right">{timingBreakdown.tcp} ms</span>
-                  </div>
-                </div>
-
-                <div className="py-2 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-purple-400" />
-                    <span className="text-[var(--ty-text)]">TLS/SSL 安全握手 (TLS Handshake)</span>
-                  </div>
-                  <div className="flex items-center gap-3 font-mono">
-                    <span className="text-[var(--ty-text-subtle)] text-[11px]">{timingBreakdown.tlsPct}%</span>
-                    <span className="text-[var(--ty-text)] font-semibold w-16 text-right">{timingBreakdown.tls} ms</span>
-                  </div>
-                </div>
-
-                <div className="py-2 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-                    <span className="text-[var(--ty-text)]">等待服务器首字节 (TTFB / Server Response)</span>
-                  </div>
-                  <div className="flex items-center gap-3 font-mono">
-                    <span className="text-[var(--ty-text-subtle)] text-[11px]">{timingBreakdown.ttfbPct}%</span>
-                    <span className="text-[var(--ty-text)] font-semibold w-16 text-right">{timingBreakdown.ttfb} ms</span>
-                  </div>
-                </div>
-
-                <div className="py-2 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                    <span className="text-[var(--ty-text)]">内容下载与传输 (Content Download)</span>
-                  </div>
-                  <div className="flex items-center gap-3 font-mono">
-                    <span className="text-[var(--ty-text-subtle)] text-[11px]">{timingBreakdown.downloadPct}%</span>
-                    <span className="text-[var(--ty-text)] font-semibold w-16 text-right">{timingBreakdown.download} ms</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {activeTab === 'diff' && (
           <div className="w-full h-full min-h-0 flex flex-col">

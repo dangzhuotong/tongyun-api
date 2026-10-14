@@ -198,40 +198,67 @@ body {
   transform: translateY(0.5px) scale(0.97);
 }
 
-/* 橦云手帐签名主操作按钮：经典有机抹茶绿 + 极细柔和高光 */
+/* 橦云手帐签名发送按钮 / 主操作按钮：有机抹茶微立体质感 */
+.ty-btn-send,
 .ty-btn-primary {
-  background: linear-gradient(180deg, #518462 0%, #467354 100%);
+  background: linear-gradient(180deg, #43885C 0%, #34734B 100%);
   color: #ffffff !important;
-  border: 1px solid #3c6448;
-  box-shadow: 0 1px 2px rgba(45, 50, 58, 0.08), 0 2px 5px -1px rgba(77, 124, 93, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.22);
-  border-radius: var(--ty-radius-sm);
+  border: 1px solid #2B633F;
+  box-shadow: 
+    0 1px 2px rgba(25, 55, 35, 0.1),
+    0 2px 6px -1px rgba(50, 115, 75, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
   font-weight: 600;
   letter-spacing: 0.02em;
   transition: all 140ms cubic-bezier(0.16, 1, 0.3, 1);
   cursor: pointer;
 }
-.ty-btn-primary:hover {
-  background: linear-gradient(180deg, #467554 0%, #3a6045 100%);
-  border-color: #32533b;
-  box-shadow: 0 2px 6px rgba(45, 50, 58, 0.12), 0 3px 8px -1px rgba(77, 124, 93, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+.ty-btn-send:hover:not(:disabled),
+.ty-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #4C9566 0%, #3A7F53 100%);
+  border-color: #275A39;
+  box-shadow: 
+    0 2px 8px -1px rgba(50, 115, 75, 0.38),
+    0 1px 3px rgba(25, 55, 35, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
   transform: translateY(-0.5px);
 }
-.ty-btn-primary:active {
+.ty-btn-send:active:not(:disabled),
+.ty-btn-primary:active:not(:disabled) {
+  background: linear-gradient(180deg, #2E6541 0%, #265536 100%);
+  border-color: #1F452C;
+  box-shadow: 0 1px 2px rgba(25, 55, 35, 0.2), inset 0 1px 2px rgba(0, 0, 0, 0.16);
   transform: translateY(0.5px) scale(0.985);
-  box-shadow: 0 1px 2px rgba(45, 50, 58, 0.12);
+}
+.ty-btn-send:disabled,
+.ty-btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
+:root[data-theme="dark"] .ty-btn-send,
+:root.dark .ty-btn-send,
 :root[data-theme="dark"] .ty-btn-primary,
 :root.dark .ty-btn-primary {
-  background: linear-gradient(180deg, #74b489 0%, #62a177 100%);
-  color: #0d130e !important;
-  border: 1px solid #538b65;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  background: linear-gradient(180deg, #5AA173 0%, #478B5F 100%);
+  color: #ffffff !important;
+  border: 1px solid #366E49;
+  box-shadow: 
+    0 1px 3px rgba(0, 0, 0, 0.35),
+    0 2px 6px -1px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
-:root[data-theme="dark"] .ty-btn-primary:hover,
-:root.dark .ty-btn-primary:hover {
-  background: linear-gradient(180deg, #83c498 0%, #70af85 100%);
-  color: #0d130e !important;
+:root[data-theme="dark"] .ty-btn-send:hover:not(:disabled),
+:root.dark .ty-btn-send:hover:not(:disabled),
+:root[data-theme="dark"] .ty-btn-primary:hover:not(:disabled),
+:root.dark .ty-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #6AB784 0%, #529B6C 100%);
+  border-color: #3E7C53;
+  box-shadow: 
+    0 2px 8px -1px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 /* 高奢幽灵次要按钮：日常零边框呼吸感，悬浮浮现温润白气泡衬底 */

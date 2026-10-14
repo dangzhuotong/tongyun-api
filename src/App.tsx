@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { GitBranch, FolderTree, Cpu, Keyboard } from 'lucide-react';
+import { GitBranch, FolderTree, Keyboard } from 'lucide-react';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { TabBar, TabItem } from './components/TabBar';
@@ -12,7 +12,6 @@ import { GitStatusModal } from './components/GitStatusModal';
 import { AiInspectorModal } from './components/AiInspectorModal';
 import { CollectionRunnerModal } from './components/CollectionRunnerModal';
 import { ShortcutsModal } from './components/ShortcutsModal';
-import { AgentHud } from './components/AgentHud';
 import { apiClient, GitStatusResult, isTauri } from './services/apiClient';
 import {
   RequestData,
@@ -102,8 +101,8 @@ export const App: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Agent 协同态势与思考流 (HUD)
-  const [agentTelemetry, setAgentTelemetry] = useState<AgentTelemetry | null>(null);
-  const [agentActivities, setAgentActivities] = useState<AgentActivityItem[]>([]);
+  const [_agentTelemetry, setAgentTelemetry] = useState<AgentTelemetry | null>(null);
+  const [_agentActivities, setAgentActivities] = useState<AgentActivityItem[]>([]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -1040,42 +1039,7 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentRequest, activeTab, activeEnvironment, isSending, tabs, activeTabId, handleQuickSwitchEnvAndReplay]);
 
-  // 主考官裁决反馈给外部 Agent (Human-in-the-Loop)
-  const handleSendHumanFeedback = async (feedbackText: string) => {
-    const feedbackPayload = {
-      text: feedbackText,
-      timestamp: Date.now(),
-      activeRequest: {
-        id: currentRequest.id,
-        name: currentRequest.name,
-        method: currentRequest.method,
-        url: currentRequest.url,
-      },
-      lastResponse: response ? {
-        status: response.status,
-        time_ms: response.time_ms,
-        size_bytes: response.size_bytes,
-      } : null,
-    };
 
-    try {
-      await fetch('http://127.0.0.1:4171/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ human_feedback: feedbackPayload }),
-      });
-      await fetch('http://127.0.0.1:4171/api/feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(feedbackPayload),
-      }).catch(() => {});
-    } catch (err) {
-      console.warn('Post feedback to bridge error:', err);
-    }
-
-    navigator.clipboard.writeText(`[人类主考官裁决] ${feedbackText}`);
-    showToast('💬 裁决指令已存入 Bridge 待办队列并复制到剪贴板！');
-  };
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[var(--ty-bg)] text-[var(--ty-text)]">
@@ -1104,18 +1068,6 @@ export const App: React.FC = () => {
         theme={theme}
         onToggleTheme={() => setTheme(t => t === 'planner' ? 'dark' : 'planner')}
         onQuickSwitchEnv={handleQuickSwitchEnvAndReplay}
-      />
-
-      {/* Agent Live Cockpit HUD (人类监视大屏与态势舱) */}
-      <AgentHud
-        telemetry={agentTelemetry}
-        activityStream={agentActivities}
-        isSending={isSending}
-        currentResponse={response}
-        currentRequest={currentRequest}
-        onClearTelemetry={() => setAgentTelemetry(null)}
-        onSendFeedback={handleSendHumanFeedback}
-        showToast={showToast}
       />
 
       {/* Main Content Layout */}
@@ -1191,7 +1143,7 @@ export const App: React.FC = () => {
         </main>
       </div>
 
-      {/* IntelliJ Workbench Status Bar (24px) */}
+      {/* Workbench Status Bar (24px) */}
       <footer className="h-6 bg-[var(--ty-nav-bg)] border-t border-[var(--ty-border)] px-3 text-[11px] font-mono text-[var(--ty-text-subtle)] flex items-center justify-between shrink-0 select-none z-20">
         <div className="flex items-center gap-3">
           <button
@@ -1222,25 +1174,6 @@ export const App: React.FC = () => {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setIsAiInspectorOpen(true)}
-            className="flex items-center gap-1 hover:text-[var(--ty-text)] transition-colors"
-            title="AI 观测台"
-          >
-            <Cpu className="w-3 h-3 text-[var(--ty-matcha)]" />
-            <span>AI Bridge :4171</span>
-          </button>
-
-          <div className="h-3 w-[1px] bg-[var(--ty-border)]" />
-
-          <span title="底层原生网络栈">Rust reqwest (rustls)</span>
-
-          <div className="h-3 w-[1px] bg-[var(--ty-border)]" />
-
-          <span>UTF-8</span>
-
-          <div className="h-3 w-[1px] bg-[var(--ty-border)]" />
-
-          <button
             onClick={() => setIsShortcutsModalOpen(true)}
             className="flex items-center gap-1 text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors"
             title="快捷键速查表 (F1 / Ctrl+Alt+K)"
@@ -1256,7 +1189,7 @@ export const App: React.FC = () => {
             className="text-[var(--ty-matcha)] hover:underline"
             title="当前激活环境"
           >
-            {activeEnvironment ? activeEnvironment.name : 'No Environment'}
+            {activeEnvironment ? activeEnvironment.name : '无环境'}
           </button>
         </div>
       </footer>

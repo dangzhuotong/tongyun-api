@@ -52,17 +52,14 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenGitModal,
   onOpenAiInspector,
   onOpenCollectionRunner,
-  executionLogsCount,
   gitBranch,
   gitModifiedCount,
   onNewRequest,
   onSaveCurrentRequest,
   onRefreshWorkspace,
   isDirty,
-  activeRequestName,
   theme,
   onToggleTheme,
-  onQuickSwitchEnv,
 }) => {
   const shortWs = workspacePath.length > 28 ? '...' + workspacePath.slice(-25) : workspacePath;
 
@@ -76,9 +73,6 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
           <span className="text-xs font-bold text-[var(--ty-text)] tracking-tight">
             橦云接口
-          </span>
-          <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-[var(--ty-matcha-tint)] text-[var(--ty-matcha)] font-medium border border-[var(--ty-matcha-soft)]">
-            v0.1
           </span>
         </div>
 
@@ -141,19 +135,6 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Middle Active Request Title */}
-      <div className="hidden lg:flex items-center gap-2 text-xs">
-        {activeRequestName && (
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/70 dark:bg-white/[0.05] border border-[var(--ty-border)] text-[11px] font-mono shadow-2xs">
-            <span className="text-[var(--ty-text-subtle)]">正在编辑:</span>
-            <span className="font-semibold text-[var(--ty-text)]">{activeRequestName}</span>
-            {isDirty && (
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--ty-peach-soft)] shrink-0 animate-pulse" title="有未保存改动" />
-            )}
-          </div>
-        )}
-      </div>
-
       {/* Right Actions: Environment, Tools, Actions */}
       <div className="flex items-center gap-1">
         {/* Environment selector */}
@@ -164,11 +145,11 @@ export const Header: React.FC<HeaderProps> = ({
             className="bg-transparent text-[var(--ty-text)] py-0.5 pl-2 pr-1 outline-none cursor-pointer text-[11px] font-mono"
           >
             <option value="" className="bg-[var(--ty-surface)] text-[var(--ty-text-muted)]">
-              无环境 (No Env)
+              无环境
             </option>
             {environments.map(env => (
               <option key={env.id} value={env.id} className="bg-[var(--ty-surface)] text-[var(--ty-text)]">
-                🌱 {env.name} ({env.variables.filter(v => v.enabled).length}项)
+                {env.name}
               </option>
             ))}
           </select>
@@ -181,19 +162,6 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </div>
 
-        {/* Quick Switch & Replay button */}
-        {environments.length > 0 && onQuickSwitchEnv && (
-          <button
-            onClick={onQuickSwitchEnv}
-            title="一键循环切换下一个环境并即刻重放请求 (快捷键: Ctrl + E)"
-            className="ty-pressable flex items-center gap-1 px-2 h-7 rounded-md text-xs bg-white/70 dark:bg-white/[0.06] hover:bg-white dark:hover:bg-white/[0.1] border border-[var(--ty-border)] text-[var(--ty-honey)] hover:text-[var(--ty-honey)] transition-all font-mono mr-1 shadow-2xs"
-          >
-            <RefreshCw className="w-3 h-3 text-[var(--ty-honey)]" />
-            <span className="text-[10px] hidden sm:inline font-medium">切环境重放</span>
-            <kbd className="text-[9px] px-1 py-0.2 rounded bg-black/5 dark:bg-white/10 text-[var(--ty-text-subtle)] border border-[var(--ty-border)]">Ctrl+E</kbd>
-          </button>
-        )}
-
         {/* AI Inspector Button */}
         <button
           onClick={onOpenAiInspector}
@@ -202,11 +170,6 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <Bot className="w-3.5 h-3.5 text-[var(--ty-sky)]" />
           <span className="text-[11px] font-medium">观测台</span>
-          {executionLogsCount !== undefined && executionLogsCount > 0 && (
-            <span className="px-1.5 py-0.1 rounded-full text-[9px] bg-[var(--ty-sky-tint)] text-[var(--ty-sky)] border border-[var(--ty-sky-soft)] font-mono font-semibold">
-              {executionLogsCount}
-            </span>
-          )}
         </button>
 
         {/* Collection Runner Button */}

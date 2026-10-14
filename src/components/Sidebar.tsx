@@ -319,7 +319,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {activeTab === 'collections' && (
           <div className="flex items-center justify-between text-xs text-[var(--ty-text-muted)] px-1">
-            <span className="text-[10px] text-[var(--ty-text-subtle)] uppercase tracking-wider font-mono">COLLECTIONS</span>
+            <span className="text-[10px] text-[var(--ty-text-subtle)]">全部请求</span>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => onCreateRequest()}
