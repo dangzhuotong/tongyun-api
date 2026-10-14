@@ -243,4 +243,63 @@ mod tests {
         let error = scan_workspace(&missing).unwrap_err();
         assert!(error.contains("无法打开文件夹"));
     }
+
+    #[test]
+    fn test_depth_calculation() {
+        assert_eq!(depth("file.http"), 0);
+        assert_eq!(depth("folder/file.http"), 1);
+        assert_eq!(depth("a/b/c/file.http"), 3);
+        assert_eq!(depth(""), 0);
+    }
+
+    #[test]
+    fn test_kind_rank() {
+        assert_eq!(kind_rank("public"), 0);
+        assert_eq!(kind_rank("private"), 1);
+        assert_eq!(kind_rank("unknown"), 1);
+    }
+
+    #[test]
+    fn test_relative_path() {
+        let root = Path::new("test_dir");
+        let nested = root.join("nested").join("case.http");
+        assert_eq!(relative(root, &nested), "nested/case.http");
+
+        let flat = root.join("root_case.http");
+        assert_eq!(relative(root, &flat), "root_case.http");
+    }
+
+    #[test]
+    fn scans_rest_extension_files() {
+        let root = tempfile::tempdir().unwrap();
+        let base = root.path();
+        fs::write(base.join("sample.rest"), "GET https://httpbin.org/get\n").unwrap();
+
+        let scanned = scan_workspace(base).unwrap();
+        assert_eq!(scanned.http_files.len(), 1);
+        assert_eq!(scanned.http_files[0].relative_path, "sample.rest");
+        assert!(scanned.http_files[0].content.contains("httpbin.org"));
+    }
+
+    #[test]
+    fn scans_empty_workspace() {
+        let root = tempfile::tempdir().unwrap();
+        let scanned = scan_workspace(root.path()).unwrap();
+        assert!(scanned.http_files.is_empty());
+        assert!(scanned.env_files.is_empty());
+        assert!(scanned.warnings.is_empty());
+    }
+
+    #[test]
+    fn finds_examples_directory_when_present() {
+        let root = tempfile::tempdir().unwrap();
+        let base = root.path();
+        let examples_dir = base.join("examples");
+        fs::create_dir_all(&examples_dir).unwrap();
+        fs::write(examples_dir.join("http-client.env.json"), "{}").unwrap();
+
+        let found = find_examples_dir(base);
+        assert!(found.is_some());
+        assert_eq!(found.unwrap(), examples_dir.canonicalize().unwrap());
+    }
 }
