@@ -3,49 +3,70 @@
  * 同步自 tongyun-git / tongyun-planner：暖奶茶底、抹茶绿主操作、蜜桃红强调/危险。
  */
 :root {
-  /* 表面（亮色） */
-  --ty-bg: #f6f1e9;            /* 奶茶底：窗口/页面背景 */
-  --ty-surface: #fffdf9;       /* 卡片、面板 */
-  --ty-surface-raised: #f0e9de;/* 工具条、悬停、分段控件底 */
-  --ty-surface-sunken: #efe7da;/* 输入框底、代码/日志区浅色版 */
-  --ty-border: #e6dccb;
-  --ty-border-strong: #d6c8b1;
+  /* 表面（亮色 - 橦云手帐经典暖奶茶与纸质卡片） */
+  /* 表面（亮色 - 橦云手帐经典温润宣纸与象牙卡片） */
+  --ty-bg: #FAF8F5;            /* 经典手帐米白底：温润透气、护眼柔和 */
+  --ty-nav-bg: #F4EFEA;        /* 燕麦壳底色：外框、侧栏、顶栏、底栏纸壳 */
+  --ty-surface: #FFFFFF;       /* 纯白纸质面板：清爽象牙明亮卡片 */
+  --ty-surface-raised: #F6F1EA;/* 燕麦微凸起/悬停背板 (柔和明亮，告别暗黄) */
+  --ty-surface-sunken: #F9F6F1;/* 轻柔宣纸白槽：输入框、代码底区、槽位 */
+  --ty-border: #EFEBE4;        /* 经典细亚麻发丝线 (手帐标准分界线) */
+  --ty-border-strong: #DFD8CC;
 
-  /* 文字 */
-  --ty-text: #2d323a;          /* 暖碳灰正文 */
-  --ty-text-muted: #6b6257;    /* 次要文字 */
-  --ty-text-subtle: #978b7c;   /* 占位、元信息 */
+  /* 文字体系 (暖碳灰与石墨) */
+  --ty-text: #2D323A;          /* 暖碳灰正文：克制、柔和、清晰，避免生硬死黑 */
+  --ty-text-muted: #555D68;    /* 次要说明文字：沉稳清晰 */
+  --ty-text-subtle: #8C94A0;   /* 元信息与占位文字 */
 
-  /* 抹茶绿：主操作、选中、成功 */
-  --ty-matcha: #4d7c5d;
-  --ty-matcha-hover: #3f684c;
-  --ty-matcha-soft: #c4d7b2;
-  --ty-matcha-tint: #edf3e7;
-  --ty-on-matcha: #ffffff;
+  /* 抹茶绿 (Matcha)：主操作、成功、激活 */
+  --ty-matcha: #4D7C5D;
+  --ty-matcha-hover: #3F684C;
+  --ty-matcha-soft: #DEEAE2;
+  --ty-matcha-tint: #F0F5F1;
+  --ty-on-matcha: #FFFFFF;
 
-  /* 蜜桃红：强调、危险、删除 */
-  --ty-peach: #c2593f;
-  --ty-peach-text: #a34e36;
-  --ty-peach-soft: #f5dfdb;
-  --ty-peach-tint: #fcf2f0;
+  /* 天空蓝 / 雾蓝 (Sky)：查询、信息、主方法 */
+  --ty-sky: #366B80;
+  --ty-sky-soft: #D0E2E8;
+  --ty-sky-tint: #EBF3F6;
 
-  /* 辅助色 */
-  --ty-honey: #8b6e3c;         /* 警告/待处理文字 */
-  --ty-honey-tint: #faf1dd;
-  --ty-sky: #3e6f9e;           /* 信息/修改 */
-  --ty-sky-tint: #eaf1f7;
+  /* 洋甘菊 / 暖金 (Chamomile / Honey)：警告、数字、待处理 */
+  --ty-honey: #8B6E3C;
+  --ty-honey-soft: #F0E4D2;
+  --ty-honey-tint: #FAF5ED;
+
+  /* 蜜桃粉 / 樱粉 (Rose / Peach)：强调、删除、危险 */
+  --ty-peach: #A34E36;
+  --ty-peach-text: #A34E36;
+  --ty-peach-soft: #F5DFDB;
+  --ty-peach-tint: #FCF2F0;
+
+  /* 薰衣草紫 (Lavender)：布尔值、PATCH */
+  --ty-lavender: #5C528B;
+  --ty-lavender-soft: #E5E2EE;
+  --ty-lavender-tint: #F3F2F7;
+
+  /* 代码语法词法颜色 (橦云手帐矿物墨色) */
+  --ty-token-key: #366B80;     /* 雾蓝键名 */
+  --ty-token-string: #4D7C5D;  /* 抹茶绿文本 */
+  --ty-token-number: #8B6E3C;  /* 洋甘菊暖金数值 */
+  --ty-token-boolean: #5C528B; /* 薰衣草紫布尔值 */
+  --ty-token-null: #8C94A0;    /* 亚麻灰 */
+  --ty-token-punctuation: #78716C;
+  --ty-token-variable: #A34E36;
+  --ty-token-var-bg: #FCF2F0;
 
   /* 形状 */
   --ty-radius-xs: 4px;
   --ty-radius-sm: 6px;
-  --ty-radius-md: 10px;        /* 卡片、窗口圆角 */
+  --ty-radius-md: 10px;
   --ty-radius-lg: 14px;
   --ty-radius-pill: 999px;
 
-  /* 阴影 */
-  --ty-shadow-card: 0 1px 2px rgba(120, 110, 95, 0.06), 0 6px 16px -8px rgba(154, 142, 128, 0.18);
-  --ty-shadow-pop: 0 14px 34px -12px rgba(120, 110, 95, 0.28), 0 2px 6px rgba(120, 110, 95, 0.08);
-  --ty-focus-ring: 0 0 0 3px rgba(77, 124, 93, 0.28);
+  /* 阴影 - 温暖纸质手账层次 */
+  --ty-shadow-card: 0 2px 8px -2px rgba(120, 110, 95, 0.06), 0 1px 3px rgba(120, 110, 95, 0.03);
+  --ty-shadow-pop: 0 14px 30px -10px rgba(120, 110, 95, 0.16), 0 2px 6px rgba(120, 110, 95, 0.06);
+  --ty-focus-ring: 0 0 0 3px rgba(77, 124, 93, 0.22);
 
   /* 字体 */
   --ty-font-sans: "Plus Jakarta Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -57,33 +78,50 @@
   --ty-font-size-xl: 20px;
 }
 
-/* 橦云暗色规范（与 tongyun-git 保持绝对一致） */
+/* 橦云暗色规范（与 tongyun-git / tongyun-planner 保持一致） */
 :root[data-theme="dark"],
-:root.dark,
-body {
-  --ty-bg: #17181b;
-  --ty-surface: #1c1d21;
-  --ty-surface-raised: #23252b;
-  --ty-surface-sunken: #141518;
-  --ty-border: #33353a;
-  --ty-border-strong: #44464d;
-  --ty-text: #ece7e0;
-  --ty-text-muted: #a8a096;
-  --ty-text-subtle: #7d766d;
-  --ty-matcha: #6fad84;
-  --ty-matcha-hover: #7fcc9a;
-  --ty-matcha-soft: #3f684c;
-  --ty-matcha-tint: #1f2b23;
-  --ty-on-matcha: #10140f;
-  --ty-peach: #e06d53;
-  --ty-peach-text: #e8866f;
-  --ty-peach-soft: #4a2c27;
-  --ty-peach-tint: #2d1f1c;
-  --ty-honey: #d9b46a;
-  --ty-honey-tint: #2c2619;
-  --ty-sky: #8fb3d6;
-  --ty-sky-tint: #1d2630;
+:root.dark {
+  --ty-bg: #141518;
+  --ty-nav-bg: #18191D;
+  --ty-surface: #1E2025;
+  --ty-surface-raised: #25282F;
+  --ty-surface-sunken: #17181C;
+  --ty-border: #2C2E35;
+  --ty-border-strong: #3D404A;
+  --ty-text: #ECE7E0;
+  --ty-text-muted: #A8A096;
+  --ty-text-subtle: #7D766D;
+  --ty-matcha: #6FAD84;
+  --ty-matcha-hover: #7FCC9A;
+  --ty-matcha-soft: #2D3F33;
+  --ty-matcha-tint: #1F2B23;
+  --ty-on-matcha: #10140F;
+  --ty-peach: #E06D53;
+  --ty-peach-text: #E8866F;
+  --ty-peach-soft: #3E2B27;
+  --ty-peach-tint: #2D1F1C;
+  --ty-honey: #D9B46A;
+  --ty-honey-soft: #3D3523;
+  --ty-honey-tint: #2C2619;
+  --ty-sky: #8FB3D6;
+  --ty-sky-soft: #2A3947;
+  --ty-sky-tint: #1D2630;
+  --ty-lavender: #B598FF;
+  --ty-lavender-soft: #35304B;
+  --ty-lavender-tint: #242133;
+
+  /* 代码与高亮词法颜色 (暗色荧光) */
+  --ty-token-key: #78A9FF;
+  --ty-token-string: #6FAD84;
+  --ty-token-number: #D9B46A;
+  --ty-token-boolean: #B598FF;
+  --ty-token-null: #7D766D;
+  --ty-token-punctuation: #A8A096;
+  --ty-token-variable: #E8866F;
+  --ty-token-var-bg: rgba(224, 109, 83, 0.15);
+
   --ty-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 16px -8px rgba(0, 0, 0, 0.5);
   --ty-shadow-pop: 0 14px 34px -12px rgba(0, 0, 0, 0.6);
   --ty-focus-ring: 0 0 0 3px rgba(111, 173, 132, 0.35);
 }
+

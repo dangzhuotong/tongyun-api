@@ -106,24 +106,24 @@ export const ImportModal: React.FC<ImportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 select-none animate-modal-backdrop">
-      <div className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-xl shadow-2xl flex flex-col overflow-hidden animate-modal-pop">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 select-none animate-modal-backdrop">
+      <div className="w-full max-w-2xl bg-[var(--ty-surface)] border border-[var(--ty-border)] rounded-[var(--ty-radius-lg)] shadow-[var(--ty-shadow-pop)] flex flex-col overflow-hidden animate-modal-pop">
         {/* Header */}
-        <div className="h-12 px-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/40">
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
-            <FolderDown className="w-4 h-4 text-sky-400" />
+        <div className="h-11 px-4 border-b border-[var(--ty-border)] flex items-center justify-between bg-[var(--ty-surface-raised)]">
+          <div className="flex items-center gap-2 text-xs font-semibold text-[var(--ty-text)]">
+            <FolderDown className="w-4 h-4 text-[var(--ty-matcha)]" />
             <span>导入接口与集合</span>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-200 p-1 rounded hover:bg-slate-800"
+            className="text-[var(--ty-text-subtle)] hover:text-[var(--ty-text)] p-1 rounded hover:bg-[var(--ty-surface)]"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Tab switcher */}
-        <div className="flex items-center border-b border-slate-800 px-4 bg-slate-950/30 text-xs gap-4">
+        <div className="flex items-center border-b border-[var(--ty-border)] px-4 bg-[var(--ty-surface-sunken)] text-xs gap-4">
           <button
             onClick={() => {
               setActiveTab('http');
@@ -131,8 +131,8 @@ export const ImportModal: React.FC<ImportModalProps> = ({
             }}
             className={`py-2.5 font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
               activeTab === 'http'
-                ? 'text-sky-400 border-sky-400'
-                : 'text-slate-400 border-transparent hover:text-slate-200'
+                ? 'text-[var(--ty-matcha)] border-[var(--ty-matcha)]'
+                : 'text-[var(--ty-text-muted)] border-transparent hover:text-[var(--ty-text)]'
             }`}
           >
             <FileCode2 className="w-3.5 h-3.5" />
@@ -145,8 +145,8 @@ export const ImportModal: React.FC<ImportModalProps> = ({
             }}
             className={`py-2.5 font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
               activeTab === 'curl'
-                ? 'text-sky-400 border-sky-400'
-                : 'text-slate-400 border-transparent hover:text-slate-200'
+                ? 'text-[var(--ty-matcha)] border-[var(--ty-matcha)]'
+                : 'text-[var(--ty-text-muted)] border-transparent hover:text-[var(--ty-text)]'
             }`}
           >
             <Terminal className="w-3.5 h-3.5" />
@@ -159,8 +159,8 @@ export const ImportModal: React.FC<ImportModalProps> = ({
             }}
             className={`py-2.5 font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
               activeTab === 'postman'
-                ? 'text-sky-400 border-sky-400'
-                : 'text-slate-400 border-transparent hover:text-slate-200'
+                ? 'text-[var(--ty-matcha)] border-[var(--ty-matcha)]'
+                : 'text-[var(--ty-text-muted)] border-transparent hover:text-[var(--ty-text)]'
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
@@ -173,8 +173,8 @@ export const ImportModal: React.FC<ImportModalProps> = ({
             }}
             className={`py-2.5 font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
               activeTab === 'openapi'
-                ? 'text-sky-400 border-sky-400'
-                : 'text-slate-400 border-transparent hover:text-slate-200'
+                ? 'text-[var(--ty-matcha)] border-[var(--ty-matcha)]'
+                : 'text-[var(--ty-text-muted)] border-transparent hover:text-[var(--ty-text)]'
             }`}
           >
             <FileCode2 className="w-3.5 h-3.5" />
@@ -184,7 +184,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
 
         {/* Body */}
         <div className="p-4 space-y-3">
-          <div className="flex items-center justify-between text-xs text-slate-400">
+          <div className="flex items-center justify-between text-xs text-[var(--ty-text-muted)]">
             <span>
               {activeTab === 'http' && '直接粘贴 IntelliJ .http / .rest 文本，自动按 ### 拆分为纯文本接口用例：'}
               {activeTab === 'curl' && '直接粘贴完整的 cURL 命令：'}
@@ -192,7 +192,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
               {activeTab === 'openapi' && '直接粘贴 OpenAPI 3.0 或 Swagger JSON，将自动按 Tag 分组创建纯文本接口：'}
             </span>
             {activeTab !== 'curl' && (
-              <label className="flex items-center gap-1 text-[11px] text-sky-400 hover:text-sky-300 cursor-pointer">
+              <label className="flex items-center gap-1 text-[11px] text-[var(--ty-matcha)] hover:underline cursor-pointer">
                 <FileUp className="w-3.5 h-3.5" />
                 <span>选择本地文件</span>
                 <input
@@ -221,11 +221,11 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                 ? `{\n  "info": { "name": "我的接口集合" },\n  "item": [...] \n}`
                 : `{\n  "openapi": "3.0.0",\n  "info": { "title": "API Spec" },\n  "paths": {...}\n}`
             }
-            className="w-full bg-slate-950 border border-slate-800 rounded-md p-3 text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-sky-500 resize-none leading-relaxed"
+            className="w-full bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] rounded-[var(--ty-radius-sm)] p-3 text-xs font-mono text-[var(--ty-text)] placeholder-[var(--ty-text-subtle)] focus:outline-none focus:border-[var(--ty-matcha)] resize-none leading-relaxed"
           />
 
           {error && (
-            <div className="flex items-center gap-1.5 text-xs text-rose-400 bg-rose-500/10 p-2 rounded border border-rose-500/20">
+            <div className="flex items-center gap-1.5 text-xs text-rose-500 bg-rose-500/10 p-2 rounded-[var(--ty-radius-xs)] border border-rose-500/20">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
             </div>
@@ -233,17 +233,17 @@ export const ImportModal: React.FC<ImportModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="h-12 px-4 border-t border-slate-800 flex items-center justify-end gap-2 bg-slate-950/40">
+        <div className="h-12 px-4 border-t border-[var(--ty-border)] flex items-center justify-end gap-2 bg-[var(--ty-surface-raised)]">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
+            className="px-3 py-1.5 rounded-[var(--ty-radius-sm)] bg-[var(--ty-surface)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-[var(--ty-text)] text-xs transition-colors"
           >
             取消
           </button>
           <button
             onClick={handleImport}
             disabled={isImporting}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded bg-sky-500 hover:bg-sky-400 text-white font-medium text-xs shadow-md shadow-sky-500/20 transition-all disabled:opacity-50"
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-[var(--ty-radius-sm)] bg-[var(--ty-matcha)] hover:bg-[var(--ty-matcha-hover)] text-white font-medium text-xs shadow-xs transition-all disabled:opacity-50"
           >
             <span>{isImporting ? '导入中...' : activeTab === 'curl' ? '导入并填充' : '批量生成纯文本接口'}</span>
             <ArrowRight className="w-3.5 h-3.5" />

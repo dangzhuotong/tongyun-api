@@ -37,34 +37,34 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-modal-backdrop">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[85vh] overflow-hidden animate-modal-pop">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-modal-backdrop">
+      <div className="bg-[var(--ty-surface)] border border-[var(--ty-border)] rounded-[var(--ty-radius-lg)] shadow-[var(--ty-shadow-pop)] w-full max-w-3xl flex flex-col max-h-[85vh] overflow-hidden animate-modal-pop">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-slate-950/60">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--ty-border)] bg-[var(--ty-surface-raised)]">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-sky-500/10 text-sky-400">
+            <div className="p-1.5 rounded-lg bg-[var(--ty-matcha-tint)] text-[var(--ty-matcha)]">
               <Code2 className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-[var(--ty-text)] flex items-center gap-2">
                 <span>生成客户端调用代码</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--ty-surface-sunken)] text-[var(--ty-text-muted)] border border-[var(--ty-border)]">
                   {request.method} {request.name}
                 </span>
               </h3>
-              <p className="text-xs text-slate-400">将当前接口直接转换为可运行的多语言工程代码</p>
+              <p className="text-xs text-[var(--ty-text-muted)]">将当前接口直接转换为可运行的多语言工程代码</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+            className="text-[var(--ty-text-subtle)] hover:text-[var(--ty-text)] p-1.5 rounded-lg hover:bg-[var(--ty-surface)] transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Language Tabs & Options Bar */}
-        <div className="px-5 py-3 border-b border-slate-800/80 bg-slate-950/30 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="px-5 py-3 border-b border-[var(--ty-border)] bg-[var(--ty-surface-sunken)]/40 flex flex-wrap items-center justify-between gap-3 text-xs">
           {/* Language selector chips */}
           <div className="flex flex-wrap items-center gap-1.5">
             {SUPPORTED_LANGUAGES.map(lang => {
@@ -73,10 +73,10 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
                 <button
                   key={lang.id}
                   onClick={() => setSelectedLang(lang.id)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                  className={`ty-pressable px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
                     isActive
-                      ? 'bg-sky-500 text-white shadow-sm shadow-sky-500/20'
-                      : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300'
+                      ? 'bg-[var(--ty-matcha)] text-white shadow-xs'
+                      : 'bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface)] text-[var(--ty-text-muted)] border border-[var(--ty-border)]'
                   }`}
                 >
                   {lang.name}
@@ -86,18 +86,18 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
           </div>
 
           {/* Interpolation Toggle */}
-          <label className="flex items-center gap-2 cursor-pointer text-slate-300 select-none">
+          <label className="flex items-center gap-2 cursor-pointer text-[var(--ty-text-muted)] select-none">
             <input
               type="checkbox"
               checked={interpolate}
               onChange={e => setInterpolate(e.target.checked)}
-              className="accent-sky-500 rounded cursor-pointer"
+              className="accent-[var(--ty-matcha)] rounded cursor-pointer"
             />
             <span className="text-xs">
               {interpolate ? '已代换环境变量' : '保留 {{变量名}} 原型'}
             </span>
             {environment && (
-              <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+              <span className="text-[10px] text-[var(--ty-matcha)] font-mono bg-[var(--ty-matcha-tint)] px-1.5 py-0.5 rounded border border-[var(--ty-matcha)]/30">
                 {environment.name}
               </span>
             )}
@@ -105,24 +105,24 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
         </div>
 
         {/* Code Content */}
-        <div className="flex-1 p-5 overflow-y-auto bg-slate-950">
+        <div className="flex-1 p-5 overflow-y-auto bg-[var(--ty-surface-sunken)]">
           <div className="relative group">
-            <pre className="font-mono text-xs text-slate-200 bg-slate-900/90 p-4 rounded-lg border border-slate-800 overflow-x-auto leading-relaxed selection:bg-sky-500/30">
+            <pre className="font-mono text-xs text-[var(--ty-text)] bg-[var(--ty-surface)] p-4 rounded-lg border border-[var(--ty-border)] overflow-x-auto leading-relaxed shadow-inner">
               {snippet}
             </pre>
 
             <button
               onClick={handleCopy}
-              className="absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 shadow-md transition-colors"
+              className="ty-pressable absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface)] border border-[var(--ty-border)] text-xs font-medium text-[var(--ty-text)] shadow-xs transition-colors"
             >
               {copied ? (
                 <>
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-400">已复制到剪贴板</span>
+                  <Check className="w-3.5 h-3.5 text-[var(--ty-matcha)]" />
+                  <span className="text-[var(--ty-matcha)]">已复制到剪贴板</span>
                 </>
               ) : (
                 <>
-                  <Copy className="w-3.5 h-3.5 text-sky-400" />
+                  <Copy className="w-3.5 h-3.5 text-[var(--ty-matcha)]" />
                   <span>复制代码</span>
                 </>
               )}
@@ -131,14 +131,14 @@ export const CodeSnippetModal: React.FC<CodeSnippetModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-1.5 text-slate-500">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+        <div className="px-5 py-3 border-t border-[var(--ty-border)] bg-[var(--ty-surface-raised)] flex items-center justify-between text-xs">
+          <div className="flex items-center gap-1.5 text-[var(--ty-text-subtle)]">
+            <Sparkles className="w-3.5 h-3.5 text-[var(--ty-honey)]" />
             <span>自动解析 Query、Headers、Auth、Payload 及环境代换</span>
           </div>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors"
+            className="ty-pressable px-4 py-1.5 rounded-md bg-[var(--ty-surface)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors"
           >
             完成并关闭
           </button>

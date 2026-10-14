@@ -12,6 +12,7 @@ import { GitStatusModal } from './components/GitStatusModal';
 import { AiInspectorModal } from './components/AiInspectorModal';
 import { CollectionRunnerModal } from './components/CollectionRunnerModal';
 import { ShortcutsModal } from './components/ShortcutsModal';
+import { AgentHud } from './components/AgentHud';
 import { apiClient, GitStatusResult, isTauri } from './services/apiClient';
 import {
   RequestData,
@@ -23,7 +24,9 @@ import {
   EnvironmentData,
   HistoryItem,
   ExecutionLogItem,
-  TestCaseItem
+  TestCaseItem,
+  AgentTelemetry,
+  AgentActivityItem
 } from './types/api';
 import { ImportedCollectionResult } from './utils/importers';
 import { evaluateAssertions, extractVariables, generateAiDiagnosticPrompt } from './utils/tester';
@@ -56,6 +59,23 @@ export const App: React.FC = () => {
   const [environments, setEnvironments] = useState<EnvironmentData[]>([]);
   const [selectedEnvId, setSelectedEnvId] = useState<string>('');
 
+  // 视觉风格主题：默认 'planner' (橦云手帐暖奶茶)，支持 'dark' (极客暗黑)
+  const [theme, setTheme] = useState<'planner' | 'dark'>(() => {
+    const saved = localStorage.getItem('tongyun_theme');
+    return saved === 'dark' ? 'dark' : 'planner';
+  });
+
+  useEffect(() => {
+    if (theme === 'planner') {
+      document.documentElement.setAttribute('data-theme', 'light');
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      document.documentElement.classList.add('dark');
+    }
+    localStorage.setItem('tongyun_theme', theme);
+  }, [theme]);
+
   // 多标签页状态
   const [tabs, setTabs] = useState<TabItem[]>([
     {
@@ -67,6 +87,7 @@ export const App: React.FC = () => {
   const [activeTabId, setActiveTabId] = useState<string>('tab_initial');
 
   const [response, setResponse] = useState<ResponsePayload | null>(null);
+  const [previousResponse, setPreviousResponse] = useState<ResponsePayload | null>(null);
   const [isSending, setIsSending] = useState<boolean>(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [executionLogs, setExecutionLogs] = useState<ExecutionLogItem[]>([]);
@@ -79,6 +100,10 @@ export const App: React.FC = () => {
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState<boolean>(false);
   const [gitStatus, setGitStatus] = useState<GitStatusResult | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Agent 协同态势与思考流 (HUD)
+  const [agentTelemetry, setAgentTelemetry] = useState<AgentTelemetry | null>(null);
+  const [agentActivities, setAgentActivities] = useState<AgentActivityItem[]>([]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -322,7 +347,7 @@ export const App: React.FC = () => {
   };
 
   // 发送 HTTP 请求
-  const handleSendRequest = async (overrideReq?: RequestData | any) => {
+  const handleSendRequest = async (overrideReq?: RequestData | any, overrideEnv?: EnvironmentData | null) => {
     // 严格检查 overrideReq 是否为真正的 RequestData（避免 React onClick 传入 SyntheticEvent）
     const isActualRequest =
       overrideReq &&
@@ -334,7 +359,8 @@ export const App: React.FC = () => {
     if (isSending || !reqToSend) return;
     setIsSending(true);
     try {
-      const resp = await apiClient.executeHttpRequest(reqToSend, activeEnvironment);
+      const envToUse = overrideEnv !== undefined ? overrideEnv : activeEnvironment;
+      const resp = await apiClient.executeHttpRequest(reqToSend, envToUse);
 
       // 1. 运行测试断言
       const testResults = evaluateAssertions(reqToSend.tests, resp);
@@ -345,8 +371,8 @@ export const App: React.FC = () => {
       resp.extracted_vars = extractedVars;
 
       // 3. 如果提取到变量且有激活环境，自动持久化更新环境变量
-      if (extractedVars.length > 0 && activeEnvironment) {
-        const updatedVars = [...activeEnvironment.variables];
+      if (extractedVars.length > 0 && envToUse) {
+        const updatedVars = [...envToUse.variables];
         let hasNew = false;
         for (const ev of extractedVars) {
           const existingIdx = updatedVars.findIndex(v => v.key === ev.key);
@@ -360,7 +386,7 @@ export const App: React.FC = () => {
         }
         if (hasNew) {
           const newEnv: EnvironmentData = {
-            ...activeEnvironment,
+            ...envToUse,
             variables: updatedVars,
           };
           await handleSaveEnvironment(newEnv);
@@ -368,7 +394,28 @@ export const App: React.FC = () => {
         }
       }
 
+      // 如果当前已有 response，记录为 previousResponse 基准
+      if (response) {
+        setPreviousResponse(response);
+      }
       setResponse(resp);
+
+      // 更新 Agent 态势为完成/异常状态，并更新最新流水
+      setAgentTelemetry(prev => prev ? {
+        ...prev,
+        status: resp.status < 400 ? 'success' : 'error',
+      } : null);
+
+      setAgentActivities(prev => {
+        if (prev.length === 0) return prev;
+        const [first, ...rest] = prev;
+        return [{
+          ...first,
+          status: resp.status < 400 ? 'success' : 'error',
+          statusCode: resp.status,
+          timeMs: resp.time_ms,
+        }, ...rest];
+      });
 
       const newHistoryItem: HistoryItem = {
         id: `hist_${Date.now()}`,
@@ -536,6 +583,30 @@ export const App: React.FC = () => {
       }));
     }
 
+    // 如果指定只投屏 Agent 思考态势与推理过程，不新建请求 Tab
+    if (payload.action === 'telemetry') {
+      const tel: AgentTelemetry = {
+        agentName: payload.agent || payload.agentName || 'AI Agent',
+        taskName: payload.task || payload.taskName || '自主接口调度',
+        thought: payload.thought || '分析推理中...',
+        step: payload.step,
+        status: payload.status || 'running',
+        timestamp: Date.now(),
+      };
+      setAgentTelemetry(tel);
+      setAgentActivities(prev => [{
+        id: `act_${Date.now()}`,
+        timestamp: Date.now(),
+        agentName: tel.agentName || 'AI Agent',
+        taskName: tel.taskName,
+        thought: tel.thought,
+        step: tel.step,
+        status: tel.status || 'running',
+      }, ...prev.slice(0, 49)]);
+      showToast(`🧠 [${tel.agentName}] 更新思考态势`);
+      return;
+    }
+
     // 如果指定只给当前激活接口追加或设置测试用例
     if (payload.action === 'append_cases' || payload.action === 'set_cases') {
       setTabs(prev =>
@@ -587,6 +658,29 @@ export const App: React.FC = () => {
     setResponse(null);
     showToast(`🤖 外部 Agent 已推入接口: ${newReq.name}`);
 
+    // 更新 AI 协同态势 (HUD)
+    const telemetry: AgentTelemetry = {
+      agentName: payload.agent || payload.agentName || 'AI Agent',
+      taskName: payload.task || payload.taskName || '自主接口调度',
+      thought: payload.thought || payload.description || '探索接口响应契约与边界',
+      step: payload.step,
+      status: 'running',
+      timestamp: Date.now(),
+    };
+    setAgentTelemetry(telemetry);
+    setAgentActivities(prev => [{
+      id: `act_${Date.now()}`,
+      timestamp: Date.now(),
+      agentName: telemetry.agentName || 'AI Agent',
+      taskName: telemetry.taskName,
+      thought: telemetry.thought,
+      step: telemetry.step,
+      status: 'running',
+      requestName: newReq.name,
+      method: newReq.method,
+      url: newReq.url,
+    }, ...prev.slice(0, 49)]);
+
     if (payload.autoSend) {
       setTimeout(() => {
         handleSendRequest(newReq);
@@ -598,6 +692,30 @@ export const App: React.FC = () => {
   useEffect(() => {
     let unlistenPush: (() => void) | undefined;
     let unlistenSend: (() => void) | undefined;
+    let unlistenTelemetry: (() => void) | undefined;
+
+    const handleTelemetryEvent = (payload: any) => {
+      const data = payload || {};
+      const tel: AgentTelemetry = {
+        agentName: data.agent || data.agentName || 'AI Agent',
+        taskName: data.task || data.taskName || '自主接口调度',
+        thought: data.thought || '分析推理中...',
+        step: data.step,
+        status: data.status || 'running',
+        timestamp: Date.now(),
+      };
+      setAgentTelemetry(tel);
+      setAgentActivities(prev => [{
+        id: `act_${Date.now()}`,
+        timestamp: Date.now(),
+        agentName: tel.agentName || 'AI Agent',
+        taskName: tel.taskName,
+        thought: tel.thought,
+        step: tel.step,
+        status: tel.status || 'running',
+      }, ...prev.slice(0, 49)]);
+      showToast(`🧠 [${tel.agentName}] 更新思考态势`);
+    };
 
     if (isTauri()) {
       import('@tauri-apps/api/event').then(({ listen }) => {
@@ -620,6 +738,14 @@ export const App: React.FC = () => {
         }).catch(err => {
           console.warn('Tauri event listen error (send):', err);
         });
+
+        listen<any>('ai-bridge-telemetry', (event) => {
+          handleTelemetryEvent(event.payload);
+        }).then(unlisten => {
+          unlistenTelemetry = unlisten;
+        }).catch(err => {
+          console.warn('Tauri event listen error (telemetry):', err);
+        });
       }).catch(err => {
         console.warn('Tauri event module import failed:', err);
       });
@@ -636,6 +762,8 @@ export const App: React.FC = () => {
           } else {
             handleSendRequest();
           }
+        } else if (event.data?.type === 'telemetry' || event.data?.type === 'thought') {
+          handleTelemetryEvent(event.data.payload);
         }
       };
     }
@@ -650,6 +778,8 @@ export const App: React.FC = () => {
           } else {
             handleSendRequest();
           }
+        } else if (e.data.type === 'telemetry' || e.data.type === 'thought') {
+          handleTelemetryEvent(e.data.payload);
         }
       }
     };
@@ -658,6 +788,7 @@ export const App: React.FC = () => {
     return () => {
       if (unlistenPush) unlistenPush();
       if (unlistenSend) unlistenSend();
+      if (unlistenTelemetry) unlistenTelemetry();
       if (channel) channel.close();
       window.removeEventListener('message', handleWindowMessage);
     };
@@ -842,6 +973,20 @@ export const App: React.FC = () => {
     }
   };
 
+  // 快捷循环切换下一个环境并即刻重放 (Ctrl+E)
+  const handleQuickSwitchEnvAndReplay = useCallback(async () => {
+    if (!environments || environments.length === 0) {
+      showToast('当前未配置可用环境变量');
+      return;
+    }
+    const currentIndex = environments.findIndex(e => e.id === selectedEnvId);
+    const nextIndex = (currentIndex + 1) % environments.length;
+    const nextEnv = environments[nextIndex];
+    setSelectedEnvId(nextEnv.id);
+    showToast(`⚡ 切换至环境【${nextEnv.name}】并即刻重放...`);
+    await handleSendRequest(undefined, nextEnv);
+  }, [environments, selectedEnvId, currentRequest, isSending, activeEnvironment]);
+
   // 全局快捷键
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -852,6 +997,10 @@ export const App: React.FC = () => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
         handleSendRequest();
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'e' || e.key === 'E') && !e.altKey) {
+        e.preventDefault();
+        handleQuickSwitchEnvAndReplay();
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 't') {
         e.preventDefault();
@@ -889,7 +1038,44 @@ export const App: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentRequest, activeTab, activeEnvironment, isSending, tabs, activeTabId]);
+  }, [currentRequest, activeTab, activeEnvironment, isSending, tabs, activeTabId, handleQuickSwitchEnvAndReplay]);
+
+  // 主考官裁决反馈给外部 Agent (Human-in-the-Loop)
+  const handleSendHumanFeedback = async (feedbackText: string) => {
+    const feedbackPayload = {
+      text: feedbackText,
+      timestamp: Date.now(),
+      activeRequest: {
+        id: currentRequest.id,
+        name: currentRequest.name,
+        method: currentRequest.method,
+        url: currentRequest.url,
+      },
+      lastResponse: response ? {
+        status: response.status,
+        time_ms: response.time_ms,
+        size_bytes: response.size_bytes,
+      } : null,
+    };
+
+    try {
+      await fetch('http://127.0.0.1:4171/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ human_feedback: feedbackPayload }),
+      });
+      await fetch('http://127.0.0.1:4171/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(feedbackPayload),
+      }).catch(() => {});
+    } catch (err) {
+      console.warn('Post feedback to bridge error:', err);
+    }
+
+    navigator.clipboard.writeText(`[人类主考官裁决] ${feedbackText}`);
+    showToast('💬 裁决指令已存入 Bridge 待办队列并复制到剪贴板！');
+  };
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[var(--ty-bg)] text-[var(--ty-text)]">
@@ -915,6 +1101,21 @@ export const App: React.FC = () => {
         isSending={isSending}
         isDirty={isDirty}
         activeRequestName={currentRequest.name}
+        theme={theme}
+        onToggleTheme={() => setTheme(t => t === 'planner' ? 'dark' : 'planner')}
+        onQuickSwitchEnv={handleQuickSwitchEnvAndReplay}
+      />
+
+      {/* Agent Live Cockpit HUD (人类监视大屏与态势舱) */}
+      <AgentHud
+        telemetry={agentTelemetry}
+        activityStream={agentActivities}
+        isSending={isSending}
+        currentResponse={response}
+        currentRequest={currentRequest}
+        onClearTelemetry={() => setAgentTelemetry(null)}
+        onSendFeedback={handleSendHumanFeedback}
+        showToast={showToast}
       />
 
       {/* Main Content Layout */}
@@ -978,6 +1179,8 @@ export const App: React.FC = () => {
               <div className="flex-1 flex flex-col min-h-[240px]">
                 <ResponseViewer
                   response={response}
+                  previousResponse={previousResponse}
+                  history={history}
                   isSending={isSending}
                   currentRequest={currentRequest}
                   onCopyAiPrompt={handleCopyAiPrompt}
@@ -989,7 +1192,7 @@ export const App: React.FC = () => {
       </div>
 
       {/* IntelliJ Workbench Status Bar (24px) */}
-      <footer className="h-6 bg-[var(--ty-surface)] border-t border-[var(--ty-border)] px-3 text-[11px] font-mono text-[var(--ty-text-subtle)] flex items-center justify-between shrink-0 select-none z-20">
+      <footer className="h-6 bg-[var(--ty-nav-bg)] border-t border-[var(--ty-border)] px-3 text-[11px] font-mono text-[var(--ty-text-subtle)] flex items-center justify-between shrink-0 select-none z-20">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsGitModalOpen(true)}

@@ -595,13 +595,13 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
   return (
     <div className="flex flex-col h-full bg-[var(--ty-bg)] overflow-hidden border-b border-[var(--ty-border)]">
       {/* IntelliJ Action Strip: Template Selector & AI Quick Fill */}
-      <div className="h-8 bg-[var(--ty-surface)] border-b border-[var(--ty-border)] px-3 text-xs flex items-center justify-between gap-3 shrink-0 select-none">
+      <div className="h-8 bg-[var(--ty-nav-bg)]/50 border-b border-[var(--ty-border)] px-3 text-xs flex items-center justify-between gap-3 shrink-0 select-none">
         <div className="flex items-center gap-2">
           {/* Templates Dropdown Button */}
           <div className="relative">
             <button
               onClick={() => setIsTemplateMenuOpen(!isTemplateMenuOpen)}
-              className="flex items-center gap-1.5 px-2 py-0.5 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-xs text-[var(--ty-text)] transition-colors"
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded-[var(--ty-radius-xs,4px)] bg-white/80 dark:bg-[var(--ty-surface)] hover:bg-white border border-[var(--ty-border)] text-xs text-[var(--ty-text)] shadow-2xs transition-all cursor-pointer"
               title="常用接口结构与用例模板"
             >
               <Sparkles className="w-3 h-3 text-[var(--ty-honey)]" />
@@ -640,7 +640,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
           <div className="relative">
             <button
               onClick={() => setIsVarMenuOpen(!isVarMenuOpen)}
-              className="flex items-center gap-1.5 px-2 py-0.5 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-xs text-[var(--ty-text)] transition-colors"
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded-[var(--ty-radius-xs,4px)] bg-white/80 dark:bg-[var(--ty-surface)] hover:bg-white border border-[var(--ty-border)] text-xs text-[var(--ty-text)] shadow-2xs transition-all cursor-pointer"
               title="查看与复制当前环境变量及 IntelliJ 动态变量"
             >
               <Variable className="w-3 h-3 text-[var(--ty-matcha)]" />
@@ -729,36 +729,39 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
       </div>
 
       {/* Unified IDE Address Omnibar */}
-      <div className="p-2 bg-[var(--ty-surface)] border-b border-[var(--ty-border)] flex items-center gap-2">
-        <div className="flex-1 flex items-center bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] rounded-[var(--ty-radius-sm)] focus-within:border-[var(--ty-matcha)] focus-within:ring-1 focus-within:ring-[var(--ty-matcha)]/30 transition-all overflow-hidden h-8">
-          {/* Method selector */}
-          <select
-            value={request.method}
-            onChange={e => {
-              const newMethod = e.target.value as HttpMethod;
-              if (newMethod === 'WS' && (!request.url || request.url.startsWith('http://') || request.url.startsWith('https://'))) {
-                const wsUrl = request.url ? request.url.replace(/^http:\/\//, 'ws://').replace(/^https:\/\//, 'wss://') : 'wss://echo.websocket.events';
-                onChange({ ...request, method: newMethod, url: wsUrl });
-              } else if (newMethod !== 'WS' && (request.url.startsWith('ws://') || request.url.startsWith('wss://'))) {
-                const httpUrl = request.url.replace(/^ws:\/\//, 'http://').replace(/^wss:\/\//, 'https://');
-                onChange({ ...request, method: newMethod, url: httpUrl });
-              } else {
-                updateField('method', newMethod);
-              }
-            }}
-            className={`font-mono text-xs font-bold px-2.5 h-full outline-none bg-transparent cursor-pointer border-r border-[var(--ty-border)] shrink-0 ${getMethodBadgeColor(
-              request.method
-            )}`}
-          >
-            <option value="GET" className="bg-[var(--ty-surface)] text-emerald-400">GET</option>
-            <option value="POST" className="bg-[var(--ty-surface)] text-amber-400">POST</option>
-            <option value="PUT" className="bg-[var(--ty-surface)] text-sky-400">PUT</option>
-            <option value="DELETE" className="bg-[var(--ty-surface)] text-rose-400">DELETE</option>
-            <option value="PATCH" className="bg-[var(--ty-surface)] text-purple-400">PATCH</option>
-            <option value="WS" className="bg-[var(--ty-surface)] text-emerald-300 font-bold">WS (WebSocket)</option>
-            <option value="HEAD" className="bg-[var(--ty-surface)] text-[var(--ty-text)]">HEAD</option>
-            <option value="OPTIONS" className="bg-[var(--ty-surface)] text-[var(--ty-text)]">OPTIONS</option>
-          </select>
+      <div className="p-2.5 bg-[var(--ty-nav-bg)]/35 border-b border-[var(--ty-border)] flex items-center gap-2">
+        <div className="flex-1 flex items-center bg-white dark:bg-[var(--ty-surface)] border border-[var(--ty-border)] rounded-lg focus-within:border-[var(--ty-matcha)] focus-within:ring-2 focus-within:ring-[var(--ty-matcha)]/15 transition-all overflow-hidden h-8.5 shadow-xs pl-1 pr-1.5">
+          {/* Method selector as a floating badge */}
+          <div className="relative flex items-center shrink-0">
+            <select
+              value={request.method}
+              onChange={e => {
+                const newMethod = e.target.value as HttpMethod;
+                if (newMethod === 'WS' && (!request.url || request.url.startsWith('http://') || request.url.startsWith('https://'))) {
+                  const wsUrl = request.url ? request.url.replace(/^http:\/\//, 'ws://').replace(/^https:\/\//, 'wss://') : 'wss://echo.websocket.events';
+                  onChange({ ...request, method: newMethod, url: wsUrl });
+                } else if (newMethod !== 'WS' && (request.url.startsWith('ws://') || request.url.startsWith('wss://'))) {
+                  const httpUrl = request.url.replace(/^ws:\/\//, 'http://').replace(/^wss:\/\//, 'https://');
+                  onChange({ ...request, method: newMethod, url: httpUrl });
+                } else {
+                  updateField('method', newMethod);
+                }
+              }}
+              className={`appearance-none font-mono text-xs font-bold pl-2.5 pr-5 h-6.5 rounded-md cursor-pointer outline-none transition-all ${getMethodBadgeColor(
+                request.method
+              )}`}
+            >
+              <option value="GET">GET</option>
+              <option value="POST">POST</option>
+              <option value="PUT">PUT</option>
+              <option value="DELETE">DELETE</option>
+              <option value="PATCH">PATCH</option>
+              <option value="WS">WS (WebSocket)</option>
+              <option value="HEAD">HEAD</option>
+              <option value="OPTIONS">OPTIONS</option>
+            </select>
+            <ChevronDown className="w-2.5 h-2.5 absolute right-1.5 pointer-events-none opacity-60 text-[var(--ty-text)]" />
+          </div>
 
           {/* URL Input */}
           <input
@@ -771,15 +774,15 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
                 onSend();
               }
             }}
-            className="flex-1 bg-transparent px-2.5 py-1 text-xs font-mono text-[var(--ty-text)] placeholder-[var(--ty-text-subtle)] outline-none"
+            className="flex-1 bg-transparent px-3 py-1 text-xs font-mono text-[var(--ty-text)] placeholder-[var(--ty-text-subtle)] outline-none"
           />
 
           {/* Inside Omnibar Quick Action Buttons */}
-          <div className="flex items-center gap-1 pr-1.5 shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
             {request.method !== 'WS' && (
               <button
                 onClick={handleCopyCurl}
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] hover:bg-[var(--ty-surface-raised)] transition-colors"
+                className="ty-btn-ghost ty-pressable flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors"
                 title="复制为完整 cURL 命令"
               >
                 {copiedCurl ? (
@@ -799,7 +802,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
             {onOpenCodeSnippet && request.method !== 'WS' && (
               <button
                 onClick={onOpenCodeSnippet}
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] hover:bg-[var(--ty-surface-raised)] transition-colors"
+                className="ty-btn-ghost ty-pressable flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors"
                 title="生成多语言客户端调用代码 (JS/Python/Go/Rust等)"
               >
                 <Code2 className="w-3 h-3 text-[var(--ty-sky)]" />
@@ -811,7 +814,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
 
         {/* Send / WS Indicator Button */}
         {request.method === 'WS' ? (
-          <div className="flex items-center gap-1.5 px-3 h-8 rounded-[var(--ty-radius-sm)] bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-mono select-none shrink-0">
+          <div className="flex items-center gap-1.5 px-3 h-8.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-mono select-none shrink-0">
             <Radio className="w-3 h-3 animate-pulse" />
             <span className="text-[11px]">WS 模式</span>
           </div>
@@ -819,15 +822,18 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
           <button
             onClick={onSend}
             disabled={isSending}
-            className="ty-pressable flex items-center gap-1.5 px-3.5 h-8 rounded-[var(--ty-radius-sm)] bg-[var(--ty-matcha)] hover:bg-[var(--ty-matcha-hover)] hover:shadow-[0_0_14px_rgba(111,173,132,0.45)] text-[#10140f] text-xs font-bold shadow-xs active:scale-95 transition-all disabled:opacity-50 shrink-0"
+            className="ty-btn-primary flex items-center gap-2 px-3.5 h-8.5 rounded-lg text-xs font-medium shadow-xs active:scale-95 transition-all disabled:opacity-50 shrink-0"
             title="发送请求 (Ctrl+Enter)"
           >
             {isSending ? (
-              <RefreshCw className="w-3 h-3 animate-spin text-[#10140f]" />
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
             ) : (
-              <Play className="w-3 h-3 fill-[#10140f]" />
+              <Play className="w-3.5 h-3.5 fill-white text-white" />
             )}
-            <span className="text-[11px] font-bold">{isSending ? '请求中...' : '发送'}</span>
+            <span className="text-xs font-medium tracking-tight">{isSending ? '请求中...' : '发送'}</span>
+            <span className="hidden sm:inline-flex items-center text-[9px] font-mono px-1 py-0.2 rounded bg-white/20 text-white leading-none">
+              Ctrl+↵
+            </span>
           </button>
         )}
       </div>
@@ -845,7 +851,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
       ) : (
         <>
           {/* Sub Tabs Bar */}
-          <div className="h-8 flex items-center border-b border-[var(--ty-border)] px-3 bg-[var(--ty-surface)] text-xs gap-1 select-none shrink-0">
+          <div className="h-8.5 flex items-center border-b border-[var(--ty-border)] px-3 bg-[var(--ty-nav-bg)]/40 text-xs gap-1 select-none shrink-0">
             {[
               { id: 'params', label: 'Params', count: activeParamsCount },
               { id: 'headers', label: 'Headers', count: activeHeadersCount },
@@ -861,18 +867,18 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`ty-pressable h-full px-2.5 text-xs font-medium border-b-2 flex items-center gap-1.5 transition-all ${
                   activeTab === tab.id
-                    ? 'text-[var(--ty-text)] border-[var(--ty-matcha)] bg-[var(--ty-surface-raised)]/30'
-                    : 'text-[var(--ty-text-muted)] border-transparent hover:text-[var(--ty-text)] hover:bg-[var(--ty-surface-raised)]/50'
+                    ? 'text-[var(--ty-text)] border-[var(--ty-matcha)] font-semibold'
+                    : 'text-[var(--ty-text-muted)] border-transparent hover:text-[var(--ty-text)]'
                 }`}
               >
                 <span>{tab.label}</span>
                 {tab.count !== undefined && tab.count > 0 && (
-                  <span className="px-1.5 py-0.2 rounded text-[10px] bg-[var(--ty-surface-raised)] border border-[var(--ty-border)] text-[var(--ty-matcha)] font-mono font-semibold">
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-[var(--ty-matcha-tint)] text-[var(--ty-matcha)] border border-[var(--ty-matcha-soft)] font-mono font-medium">
                     {tab.count}
                   </span>
                 )}
                 {tab.badge && (
-                  <span className="px-1 py-0.2 rounded text-[9px] bg-[var(--ty-surface-raised)] border border-[var(--ty-border)] text-[var(--ty-honey)] font-mono uppercase">
+                  <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-[var(--ty-sky-tint)] text-[var(--ty-sky)] border border-[var(--ty-sky-soft)] font-mono font-semibold uppercase">
                     {tab.badge}
                   </span>
                 )}
@@ -889,16 +895,16 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
               <span className="font-semibold text-[var(--ty-text)]">Query Parameters (URL 查询参数)</span>
               <button
                 onClick={handleAddParam}
-                className="flex items-center gap-1 px-2 py-1 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-[var(--ty-matcha)] text-xs transition-colors"
+                className="ty-pressable flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#F0F5F1] hover:bg-[#DEEAE2] border border-[#DEEAE2] text-[var(--ty-matcha)] text-xs font-medium transition-all shadow-2xs cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>添加参数</span>
               </button>
             </div>
 
-            <div className="border border-[var(--ty-border)] rounded-[var(--ty-radius-sm)] overflow-hidden bg-[var(--ty-surface-sunken)]">
+            <div className="border border-[var(--ty-border)] rounded-[var(--ty-radius-md)] overflow-hidden bg-white dark:bg-[var(--ty-surface)] shadow-xs">
               <table className="w-full text-xs text-left">
-                <thead className="bg-[var(--ty-surface-raised)] text-[var(--ty-text-muted)] border-b border-[var(--ty-border)]">
+                <thead className="bg-[#FAF8F5] dark:bg-[var(--ty-surface-raised)] text-[var(--ty-text-muted)] border-b border-[var(--ty-border)] text-[11px] font-medium">
                   <tr>
                     <th className="w-10 px-3 py-2 text-center">启用</th>
                     <th className="px-3 py-2 w-1/3">参数名 (Key)</th>
@@ -1000,16 +1006,16 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
               </div>
               <button
                 onClick={() => handleAddHeader()}
-                className="flex items-center gap-1 px-2 py-1 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-[var(--ty-matcha)] text-xs transition-colors"
+                className="ty-pressable flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#F0F5F1] hover:bg-[#DEEAE2] border border-[#DEEAE2] text-[var(--ty-matcha)] text-xs font-medium transition-all shadow-2xs cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>添加请求头</span>
               </button>
             </div>
 
-            <div className="border border-[var(--ty-border)] rounded-[var(--ty-radius-sm)] overflow-hidden bg-[var(--ty-surface-sunken)]">
+            <div className="border border-[var(--ty-border)] rounded-[var(--ty-radius-md)] overflow-hidden bg-white dark:bg-[var(--ty-surface)] shadow-xs">
               <table className="w-full text-xs text-left">
-                <thead className="bg-[var(--ty-surface-raised)] text-[var(--ty-text-muted)] border-b border-[var(--ty-border)]">
+                <thead className="bg-[#FAF8F5] dark:bg-[var(--ty-surface-raised)] text-[var(--ty-text-muted)] border-b border-[var(--ty-border)] text-[11px] font-medium">
                   <tr>
                     <th className="w-10 px-3 py-2 text-center">启用</th>
                     <th className="px-3 py-2 w-1/3">名称 (Header Name)</th>
@@ -1240,7 +1246,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
                   )}
                   <button
                     onClick={handlePrettifyJson}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface-sunken)] text-[var(--ty-matcha)] text-xs border border-[var(--ty-border)] transition-colors"
+                    className="ty-pressable flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#F0F5F1] hover:bg-[#DEEAE2] text-[var(--ty-matcha)] text-xs font-medium border border-[#DEEAE2] shadow-2xs transition-all cursor-pointer"
                   >
                     <Wand2 className="w-3 h-3" />
                     <span>美化格式</span>

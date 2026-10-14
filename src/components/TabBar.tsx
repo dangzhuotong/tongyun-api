@@ -26,17 +26,17 @@ export const TabBar: React.FC<TabBarProps> = ({
   onNewTab,
 }) => {
   return (
-    <div className="h-8 bg-[var(--ty-surface)] border-b border-[var(--ty-border)] flex items-center px-1.5 select-none overflow-x-auto shrink-0 gap-1 scrollbar-none">
+    <div className="h-8 bg-[var(--ty-nav-bg)] border-b border-[var(--ty-border)] flex items-center px-1.5 select-none overflow-x-auto shrink-0 gap-1 scrollbar-none">
       {tabs.map(tab => {
         const isActive = tab.id === activeTabId;
         return (
           <div
             key={tab.id}
             onClick={() => onSelectTab(tab.id)}
-            className={`group relative flex items-center gap-1.5 px-2.5 h-[28px] rounded-t-[var(--ty-radius-xs,4px)] text-xs cursor-pointer border-t-2 border-x transition-all duration-150 max-w-[200px] shrink-0 ${
+            className={`group relative flex items-center gap-1.5 px-3 h-[27px] rounded-md text-xs cursor-pointer transition-all duration-150 max-w-[200px] shrink-0 ${
               isActive
-                ? 'bg-[var(--ty-surface-raised)] border-t-[var(--ty-matcha)] border-x-[var(--ty-border)] text-[var(--ty-text)] font-medium shadow-xs'
-                : 'border-transparent text-[var(--ty-text-muted)] hover:bg-[var(--ty-surface-raised)]/50 hover:text-[var(--ty-text)]'
+                ? 'bg-white dark:bg-[var(--ty-surface)] text-[#2D323A] dark:text-[#ECE7E0] font-semibold shadow-xs border border-[#EFEBE4] dark:border-[#33353A]'
+                : 'text-[#555D68] dark:text-[#A8A096] hover:bg-white/60 dark:hover:bg-white/5 hover:text-[#2D323A]'
             }`}
           >
             {/* Method badge */}
@@ -53,7 +53,7 @@ export const TabBar: React.FC<TabBarProps> = ({
 
             {/* Unsaved dirty dot */}
             {tab.isDirty && (
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--ty-honey)] shrink-0 animate-pulse" title="有未保存修改" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#E8A0BF] shrink-0 animate-pulse" title="有未保存修改" />
             )}
 
             {/* Close button */}

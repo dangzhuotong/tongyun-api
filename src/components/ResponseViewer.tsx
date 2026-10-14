@@ -16,8 +16,8 @@ import {
   Zap,
   Activity
 } from 'lucide-react';
-import { ResponsePayload, RequestData } from '../types/api';
-
+import { ResponsePayload, RequestData, HistoryItem } from '../types/api';
+import { ResponseDiffViewer } from './ResponseDiffViewer';
 import { tokenizeJsonLine } from '../utils/jsonTokenizer';
 
 const JsonLineHighlight: React.FC<{ line: string; searchQuery: string }> = ({ line, searchQuery }) => {
@@ -43,25 +43,25 @@ const JsonLineHighlight: React.FC<{ line: string; searchQuery: string }> = ({ li
         let colorClass = 'text-[var(--ty-text)]';
         switch (token.type) {
           case 'key':
-            colorClass = 'text-sky-400 font-medium';
+            colorClass = 'text-[var(--ty-token-key)] font-medium';
             break;
           case 'string':
-            colorClass = 'text-emerald-400';
+            colorClass = 'text-[var(--ty-token-string)]';
             break;
           case 'number':
-            colorClass = 'text-amber-400 font-mono';
+            colorClass = 'text-[var(--ty-token-number)] font-mono font-semibold';
             break;
           case 'boolean':
-            colorClass = 'text-purple-400 font-bold';
+            colorClass = 'text-[var(--ty-token-boolean)] font-bold';
             break;
           case 'null':
-            colorClass = 'text-slate-400 italic';
+            colorClass = 'text-[var(--ty-token-null)] italic';
             break;
           case 'variable':
-            colorClass = 'text-emerald-300 font-bold bg-emerald-950/40 px-1 py-0.2 rounded border border-emerald-500/30';
+            colorClass = 'text-[var(--ty-token-variable)] font-bold bg-[var(--ty-token-var-bg)] px-1 py-0.2 rounded border border-[var(--ty-token-variable)]/30';
             break;
           case 'punctuation':
-            colorClass = 'text-slate-400';
+            colorClass = 'text-[var(--ty-token-punctuation)]';
             break;
           default:
             colorClass = 'text-[var(--ty-text)]';
@@ -80,6 +80,8 @@ const JsonLineHighlight: React.FC<{ line: string; searchQuery: string }> = ({ li
 
 interface ResponseViewerProps {
   response: ResponsePayload | null;
+  previousResponse?: ResponsePayload | null;
+  history?: HistoryItem[];
   isSending: boolean;
   currentRequest?: RequestData;
   onCopyAiPrompt?: () => void;
@@ -87,11 +89,13 @@ interface ResponseViewerProps {
 
 export const ResponseViewer: React.FC<ResponseViewerProps> = ({
   response,
+  previousResponse,
+  history = [],
   isSending,
   currentRequest,
   onCopyAiPrompt,
 }) => {
-  const [activeTab, setActiveTab] = useState<'body' | 'headers' | 'tests' | 'timing' | 'preview'>('body');
+  const [activeTab, setActiveTab] = useState<'body' | 'headers' | 'tests' | 'timing' | 'diff' | 'preview'>('body');
   const [viewMode, setViewMode] = useState<'pretty' | 'raw'>('pretty');
   const [copied, setCopied] = useState(false);
   const [copiedHeaders, setCopiedHeaders] = useState(false);
@@ -161,10 +165,10 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
   };
 
   const getStatusColor = (status: number) => {
-    if (status >= 200 && status < 300) return 'text-[var(--ty-matcha)] bg-[var(--ty-matcha-soft)] border-[var(--ty-matcha)]/40';
-    if (status >= 300 && status < 400) return 'text-[var(--ty-sky,#78a9ff)] bg-[var(--ty-surface-raised)] border-[var(--ty-border)]';
-    if (status >= 400 && status < 500) return 'text-[var(--ty-honey)] bg-[var(--ty-honey-soft)] border-[var(--ty-honey)]/40';
-    return 'text-[var(--ty-peach)] bg-[var(--ty-peach-soft)] border-[var(--ty-peach)]/40';
+    if (status >= 200 && status < 300) return 'text-[var(--ty-matcha)] bg-[var(--ty-matcha-tint)] border border-[var(--ty-matcha-soft)]';
+    if (status >= 300 && status < 400) return 'text-[var(--ty-sky)] bg-[var(--ty-sky-tint)] border border-[var(--ty-sky-soft)]';
+    if (status >= 400 && status < 500) return 'text-[var(--ty-honey)] bg-[var(--ty-honey-tint)] border border-[var(--ty-honey-soft)]';
+    return 'text-[var(--ty-peach)] bg-[var(--ty-peach-tint)] border border-[var(--ty-peach-soft)]';
   };
 
   const getStatusMeaning = (status: number) => {
@@ -232,9 +236,9 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
 
   if (!response) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-[var(--ty-surface-sunken)] p-6 text-center select-none text-[var(--ty-text-subtle)]">
-        <div className="w-12 h-12 rounded-[var(--ty-radius-md)] bg-[var(--ty-surface)] border border-[var(--ty-border)] flex items-center justify-center mb-3">
-          <Terminal className="w-6 h-6 text-[var(--ty-text-subtle)]" />
+      <div className="flex-1 flex flex-col items-center justify-center bg-[var(--ty-bg)] p-6 text-center select-none text-[var(--ty-text-subtle)]">
+        <div className="w-12 h-12 rounded-[var(--ty-radius-md)] bg-white dark:bg-[var(--ty-surface)] border border-[var(--ty-border)] flex items-center justify-center mb-3 shadow-2xs">
+          <Terminal className="w-6 h-6 text-[var(--ty-matcha)]" />
         </div>
         <h3 className="text-xs font-semibold text-[var(--ty-text)]">等待执行请求</h3>
         <p className="text-[11px] text-[var(--ty-text-subtle)] max-w-xs mt-1">
@@ -242,24 +246,24 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
         </p>
 
         {/* Shortcuts card */}
-        <div className="mt-5 grid grid-cols-2 gap-1.5 text-left text-xs bg-[var(--ty-surface)] p-2.5 rounded-[var(--ty-radius-sm)] border border-[var(--ty-border)] max-w-sm w-full">
-          <div className="flex items-center justify-between px-2 py-1 bg-[var(--ty-surface-sunken)] rounded-[var(--ty-radius-xs,4px)] border border-[var(--ty-border)]/50">
+        <div className="mt-5 grid grid-cols-2 gap-1.5 text-left text-xs bg-white dark:bg-[var(--ty-surface)] p-3 rounded-[var(--ty-radius-sm)] border border-[var(--ty-border)] shadow-xs max-w-sm w-full">
+          <div className="flex items-center justify-between px-2 py-1.5 bg-[var(--ty-surface-sunken)] rounded-[var(--ty-radius-xs,4px)] border border-[var(--ty-border)]/50">
             <span className="text-[var(--ty-text-muted)] text-[11px]">发送请求</span>
-            <kbd className="font-mono text-[10px] bg-[var(--ty-surface-raised)] text-[var(--ty-text)] px-1.5 py-0.2 rounded border border-[var(--ty-border)]">
+            <kbd className="font-mono text-[10px] bg-white dark:bg-[var(--ty-surface-raised)] text-[var(--ty-text)] px-1.5 py-0.2 rounded border border-[var(--ty-border)] shadow-2xs">
               Ctrl + Enter
             </kbd>
           </div>
-          <div className="flex items-center justify-between px-2 py-1 bg-[var(--ty-surface-sunken)] rounded-[var(--ty-radius-xs,4px)] border border-[var(--ty-border)]/50">
+          <div className="flex items-center justify-between px-2 py-1.5 bg-[var(--ty-surface-sunken)] rounded-[var(--ty-radius-xs,4px)] border border-[var(--ty-border)]/50">
             <span className="text-[var(--ty-text-muted)] text-[11px]">保存接口纯文本</span>
-            <kbd className="font-mono text-[10px] bg-[var(--ty-surface-raised)] text-[var(--ty-text)] px-1.5 py-0.2 rounded border border-[var(--ty-border)]">
+            <kbd className="font-mono text-[10px] bg-white dark:bg-[var(--ty-surface-raised)] text-[var(--ty-text)] px-1.5 py-0.2 rounded border border-[var(--ty-border)] shadow-2xs">
               Ctrl + S
             </kbd>
           </div>
-          <div className="flex items-center justify-between px-2 py-1 bg-[var(--ty-surface-sunken)] rounded-[var(--ty-radius-xs,4px)] border border-[var(--ty-border)]/50">
+          <div className="flex items-center justify-between px-2 py-1.5 bg-[var(--ty-surface-sunken)] rounded-[var(--ty-radius-xs,4px)] border border-[var(--ty-border)]/50">
             <span className="text-[var(--ty-text-muted)] text-[11px]">环境变量代换</span>
             <code className="font-mono text-[10px] text-[var(--ty-matcha)]">{"{{baseUrl}}"}</code>
           </div>
-          <div className="flex items-center justify-between px-2 py-1 bg-[var(--ty-surface-sunken)] rounded-[var(--ty-radius-xs,4px)] border border-[var(--ty-border)]/50">
+          <div className="flex items-center justify-between px-2 py-1.5 bg-[var(--ty-surface-sunken)] rounded-[var(--ty-radius-xs,4px)] border border-[var(--ty-border)]/50">
             <span className="text-[var(--ty-text-muted)] text-[11px]">格式标准</span>
             <span className="font-mono text-[10px] text-[var(--ty-honey)]">IntelliJ .http</span>
           </div>
@@ -269,14 +273,14 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-[var(--ty-surface-sunken)] overflow-hidden select-none">
+    <div className="flex-1 flex flex-col bg-white dark:bg-[var(--ty-surface-sunken)] overflow-hidden select-none">
       {/* Response Header Status Bar (36px compact) */}
-      <div className="h-9 px-3 border-b border-[var(--ty-border)] bg-[var(--ty-surface)] flex items-center justify-between shrink-0">
+      <div className="h-9 px-3 border-b border-[var(--ty-border)] bg-[var(--ty-nav-bg)]/50 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2.5">
           {/* Status Badge */}
           <div
             title={getStatusMeaning(response.status)}
-            className={`ty-pressable animate-fade-in px-2.5 py-0.5 rounded-[var(--ty-radius-xs,4px)] border font-mono text-[11px] font-bold flex items-center gap-1.5 shadow-2xs ${getStatusColor(
+            className={`ty-pressable animate-fade-in px-2.5 py-0.5 rounded-[var(--ty-radius-xs,4px)] font-mono text-[11px] font-bold flex items-center gap-1.5 shadow-2xs ${getStatusColor(
               response.status
             )}`}
           >
@@ -290,12 +294,12 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
             <Clock className="w-3 h-3 text-[var(--ty-text-subtle)]" />
             <span>{response.time_ms} ms</span>
             <span
-              className={`px-1 py-0.2 rounded text-[9px] font-mono font-medium ${
+              className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-medium ${
                 response.time_ms < 300
-                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25'
+                  ? 'bg-[var(--ty-matcha-tint)] text-[var(--ty-matcha)] border border-[var(--ty-matcha-soft)]'
                   : response.time_ms < 1000
-                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/25'
-                  : 'bg-rose-500/10 text-rose-400 border border-rose-500/25'
+                  ? 'bg-[var(--ty-honey-tint)] text-[var(--ty-honey)] border border-[var(--ty-honey-soft)]'
+                  : 'bg-[var(--ty-peach-tint)] text-[var(--ty-peach)] border border-[var(--ty-peach-soft)]'
               }`}
             >
               {response.time_ms < 300 ? '极速' : response.time_ms < 1000 ? '正常' : '较慢'}
@@ -313,8 +317,8 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
             <div
               className={`ty-pressable px-2 py-0.2 rounded-[var(--ty-radius-xs,4px)] border font-mono text-[10px] font-medium flex items-center gap-1 ${
                 response.test_results.every(t => t.passed)
-                  ? 'text-[var(--ty-matcha)] bg-[var(--ty-matcha-soft)] border-[var(--ty-matcha)]/40'
-                  : 'text-[var(--ty-peach)] bg-[var(--ty-peach-soft)] border-[var(--ty-peach)]/40'
+                  ? 'text-[var(--ty-matcha)] bg-[var(--ty-matcha-tint)] border border-[var(--ty-matcha-soft)]'
+                  : 'text-[var(--ty-peach)] bg-[var(--ty-peach-tint)] border border-[var(--ty-peach-soft)]'
               }`}
             >
               {response.test_results.every(t => t.passed) ? (
@@ -363,36 +367,36 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
           {onCopyAiPrompt && (
             <button
               onClick={onCopyAiPrompt}
-              className="ty-pressable flex items-center gap-1 px-2 py-1 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-xs text-[var(--ty-text)] hover:text-[var(--ty-matcha)] font-medium transition-all"
+              className="ty-btn-ghost ty-pressable flex items-center gap-1 px-2 py-1 rounded-md text-xs text-[var(--ty-text)] hover:text-[var(--ty-matcha)] font-medium transition-all"
               title={`复制 ${currentRequest?.name || '当前接口'} 的 AI 诊断 Prompt`}
             >
-              <Bot className="w-3 h-3 text-[var(--ty-matcha)]" />
+              <Bot className="w-3.5 h-3.5 text-[var(--ty-matcha)]" />
               <span className="text-[11px]">AI 诊断</span>
             </button>
           )}
 
           <button
             onClick={handleDownloadResponse}
-            className="ty-pressable flex items-center gap-1 px-2 py-1 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-xs text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-all"
+            className="ty-btn-ghost ty-pressable flex items-center gap-1 px-2 py-1 rounded-md text-xs text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-all"
             title="下载并保存响应体"
           >
-            <Download className="w-3 h-3" />
+            <Download className="w-3.5 h-3.5" />
             <span className="text-[11px]">下载</span>
           </button>
 
           <button
             onClick={activeTab === 'headers' ? handleCopyHeaders : handleCopy}
-            className="ty-pressable flex items-center gap-1 px-2 py-1 rounded-[var(--ty-radius-xs,4px)] bg-[var(--ty-surface-raised)] hover:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] text-xs text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-all"
+            className="ty-btn-ghost ty-pressable flex items-center gap-1 px-2 py-1 rounded-md text-xs text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-all"
             title="复制响应内容"
           >
             {(activeTab === 'headers' ? copiedHeaders : copied) ? (
               <>
-                <Check className="w-3 h-3 text-[var(--ty-matcha)] scale-110 transition-transform" />
-                <span className="text-[var(--ty-matcha)] text-[11px]">已复制</span>
+                <Check className="w-3.5 h-3.5 text-[var(--ty-matcha)] scale-110 transition-transform" />
+                <span className="text-[var(--ty-matcha)] text-[11px] font-medium">已复制</span>
               </>
             ) : (
               <>
-                <Copy className="w-3 h-3" />
+                <Copy className="w-3.5 h-3.5" />
                 <span className="text-[11px]">复制</span>
               </>
             )}
@@ -401,13 +405,14 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
       </div>
 
       {/* View Tabs & Search Bar (32px) */}
-      <div className="h-8 flex items-center justify-between px-3 border-b border-[var(--ty-border)] bg-[var(--ty-surface)] text-xs">
+      <div className="h-8.5 flex items-center justify-between px-3 border-b border-[var(--ty-border)] bg-[var(--ty-nav-bg)]/40 text-xs">
         <div className="flex items-center gap-1 h-full">
           {[
             { id: 'body', label: '正文 (Body)' },
             { id: 'headers', label: '响应头 (Headers)', count: response.headers.length },
             { id: 'tests', label: '断言与提取结果', badge: response.test_results?.length ? `${response.test_results.filter(t => t.passed).length}/${response.test_results.length}` : undefined },
             { id: 'timing', label: '时序瀑布 (Timing)' },
+            { id: 'diff', label: '双响应对比 (Diff)', badge: previousResponse ? '有基准' : undefined },
             { id: 'preview', label: 'HTML 预览' },
           ].map(tab => (
             <button
@@ -415,21 +420,21 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
               onClick={() => setActiveTab(tab.id as any)}
               className={`ty-pressable h-full px-2.5 text-xs font-medium border-b-2 flex items-center gap-1.5 transition-all ${
                 activeTab === tab.id
-                  ? 'text-[var(--ty-text)] border-[var(--ty-matcha)] bg-[var(--ty-surface-raised)]/30'
-                  : 'text-[var(--ty-text-muted)] border-transparent hover:text-[var(--ty-text)] hover:bg-[var(--ty-surface-raised)]/50'
+                  ? 'text-[var(--ty-text)] border-[var(--ty-matcha)] font-semibold'
+                  : 'text-[var(--ty-text-muted)] border-transparent hover:text-[var(--ty-text)]'
               }`}
             >
               <span>{tab.label}</span>
               {tab.count !== undefined && (
-                <span className="px-1.5 py-0.2 rounded text-[10px] bg-[var(--ty-surface-raised)] border border-[var(--ty-border)] text-[var(--ty-text-muted)] font-mono">
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/[0.05] dark:bg-white/[0.07] text-[var(--ty-text-muted)] font-mono">
                   {tab.count}
                 </span>
               )}
               {tab.badge && (
-                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono border ${
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
                   response.test_results?.every(t => t.passed)
-                    ? 'bg-[var(--ty-matcha-soft)] text-[var(--ty-matcha)] border-[var(--ty-matcha)]/40'
-                    : 'bg-[var(--ty-peach-soft)] text-[var(--ty-peach)] border-[var(--ty-peach)]/40'
+                    ? 'bg-[var(--ty-matcha-tint)] text-[var(--ty-matcha)] font-medium'
+                    : 'bg-[var(--ty-peach-tint)] text-[var(--ty-peach)] font-medium'
                 }`}>
                   {tab.badge}
                 </span>
@@ -605,42 +610,65 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
                   {response.test_results.map((tr, idx) => (
                     <div
                       key={idx}
-                      className={`p-3 rounded-[var(--ty-radius-sm)] border flex items-start justify-between gap-3 ${
+                      className={`p-3 rounded-[var(--ty-radius-sm)] border flex flex-col gap-2 transition-all ${
                         tr.passed
                           ? 'bg-[var(--ty-matcha-soft)] border-[var(--ty-matcha)]/40 text-[var(--ty-text)]'
-                          : 'bg-[var(--ty-peach-soft)] border-[var(--ty-peach)]/40 text-[var(--ty-text)]'
+                          : 'bg-[var(--ty-peach-soft)] border-[var(--ty-peach)]/40 text-[var(--ty-text)] shadow-xs'
                       }`}
                     >
-                      <div className="flex items-start gap-2.5">
-                        {tr.passed ? (
-                          <CheckCircle2 className="w-4 h-4 text-[var(--ty-matcha)] mt-0.5 shrink-0" />
-                        ) : (
-                          <XCircle className="w-4 h-4 text-[var(--ty-peach)] mt-0.5 shrink-0" />
-                        )}
-                        <div>
-                          <div className="font-semibold text-xs text-[var(--ty-text)]">
-                            {tr.assertion.name || tr.assertion.type}
-                          </div>
-                          <div className={`text-[11px] mt-0.5 ${tr.passed ? 'text-[var(--ty-matcha)]' : 'text-[var(--ty-peach)]'}`}>
-                            {tr.message}
-                          </div>
-                          {tr.actual && !tr.passed && (
-                            <div className="text-[10px] text-[var(--ty-text-muted)] font-mono mt-1 bg-[var(--ty-surface)] p-1.5 rounded border border-[var(--ty-border)]">
-                              实际值: {tr.actual} | 期望值: {tr.assertion.expected}
-                            </div>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-2.5">
+                          {tr.passed ? (
+                            <CheckCircle2 className="w-4 h-4 text-[var(--ty-matcha)] mt-0.5 shrink-0" />
+                          ) : (
+                            <XCircle className="w-4 h-4 text-[var(--ty-peach)] mt-0.5 shrink-0" />
                           )}
+                          <div>
+                            <div className="font-semibold text-xs text-[var(--ty-text)]">
+                              {tr.assertion.name || tr.assertion.type}
+                            </div>
+                            <div className={`text-[11px] mt-0.5 ${tr.passed ? 'text-[var(--ty-matcha)]' : 'text-[var(--ty-peach)]'}`}>
+                              {tr.message}
+                            </div>
+                          </div>
                         </div>
+
+                        <span
+                          className={`text-[10px] uppercase font-mono px-2 py-0.5 rounded-[var(--ty-radius-xs,4px)] font-bold border shrink-0 ${
+                            tr.passed
+                              ? 'bg-[var(--ty-surface)] text-[var(--ty-matcha)] border-[var(--ty-matcha)]/40'
+                              : 'bg-[var(--ty-surface)] text-[var(--ty-peach)] border-[var(--ty-peach)]/40'
+                          }`}
+                        >
+                          {tr.passed ? 'PASSED' : 'FAILED'}
+                        </span>
                       </div>
 
-                      <span
-                        className={`text-[10px] uppercase font-mono px-2 py-0.5 rounded-[var(--ty-radius-xs,4px)] font-bold border ${
-                          tr.passed
-                            ? 'bg-[var(--ty-surface)] text-[var(--ty-matcha)] border-[var(--ty-matcha)]/40'
-                            : 'bg-[var(--ty-surface)] text-[var(--ty-peach)] border-[var(--ty-peach)]/40'
-                        }`}
-                      >
-                        {tr.passed ? 'PASSED' : 'FAILED'}
-                      </span>
+                      {/* 失败用例期望与实际差分卡 (Assertion Failure Diff Card) */}
+                      {!tr.passed && (
+                        <div className="mt-1 pt-2 border-t border-[var(--ty-border)]/50 animate-fade-in">
+                          <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                            <div className="p-2 rounded bg-rose-500/10 border border-rose-500/20">
+                              <div className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold mb-1 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" />
+                                实际接收 (Actual)
+                              </div>
+                              <div className="text-rose-800 dark:text-rose-200 break-all select-all whitespace-pre-wrap font-mono leading-relaxed bg-[var(--ty-surface)]/60 p-1.5 rounded border border-rose-500/15">
+                                {tr.actual !== undefined && tr.actual !== '' ? tr.actual : '(空值 / 未捕获)'}
+                              </div>
+                            </div>
+                            <div className="p-2 rounded bg-emerald-500/10 border border-emerald-500/20">
+                              <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mb-1 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                                期望判定 (Expected)
+                              </div>
+                              <div className="text-emerald-800 dark:text-emerald-200 break-all select-all whitespace-pre-wrap font-mono leading-relaxed bg-[var(--ty-surface)]/60 p-1.5 rounded border border-emerald-500/15">
+                                {tr.assertion.expected}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -791,6 +819,16 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'diff' && (
+          <div className="w-full h-full min-h-0 flex flex-col">
+            <ResponseDiffViewer
+              currentResponse={response}
+              previousResponse={previousResponse}
+              history={history}
+            />
           </div>
         )}
 

@@ -215,3 +215,28 @@ export interface BatchRunReport {
   results: BatchRunItemResult[];
 }
 
+export interface AgentTelemetry {
+  agentName?: string;     // e.g. "Antigravity", "Cursor", "Claude Code"
+  taskName?: string;      // e.g. "接口鉴权逆向测试", "排查退款 500 NPE 缺陷"
+  thought?: string;       // e.g. "正在尝试传入过期的 JWT 令牌，验证鉴权过滤器是否返回标准 401 且附带 WWW-Authenticate 头"
+  step?: string;          // e.g. "Step 3/5"
+  status?: 'idle' | 'running' | 'success' | 'error';
+  timestamp: number;
+  details?: Record<string, any>;
+}
+
+export interface AgentActivityItem {
+  id: string;
+  timestamp: number;
+  agentName: string;
+  taskName?: string;
+  thought?: string;
+  step?: string;
+  status: 'running' | 'success' | 'error' | 'idle';
+  requestName?: string;
+  method?: HttpMethod;
+  url?: string;
+  statusCode?: number;
+  timeMs?: number;
+}
+

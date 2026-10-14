@@ -32,19 +32,19 @@ interface SidebarProps {
 export const getMethodBadgeColor = (method?: string) => {
   switch (method?.toUpperCase()) {
     case 'GET':
-      return 'text-[var(--ty-matcha)] bg-[var(--ty-matcha-soft)] border-[var(--ty-matcha)]/30';
+      return 'text-[#4D7C5D] dark:text-[#6FAD84] bg-[#F0F5F1] dark:bg-[#1F2B23] border border-[#DEEAE2] dark:border-[#2D3F33]';
     case 'POST':
-      return 'text-[var(--ty-honey)] bg-[var(--ty-honey-soft)] border-[var(--ty-honey)]/30';
+      return 'text-[#366B80] dark:text-[#8FB3D6] bg-[#EBF3F6] dark:bg-[#1D2630] border border-[#D0E2E8] dark:border-[#2A3947]';
     case 'PUT':
-      return 'text-[var(--ty-sky,#78a9ff)] bg-[var(--ty-surface-raised)] border-[var(--ty-border)]';
+      return 'text-[#8B6E3C] dark:text-[#D9B46A] bg-[#FAF5ED] dark:bg-[#2C2619] border border-[#F0E4D2] dark:border-[#3D3523]';
     case 'DELETE':
-      return 'text-[var(--ty-peach)] bg-[var(--ty-peach-soft)] border-[var(--ty-peach)]/30';
+      return 'text-[#A34E36] dark:text-[#E8866F] bg-[#FCF2F0] dark:bg-[#2D1F1C] border border-[#F5DFDB] dark:border-[#3E2B27]';
     case 'PATCH':
-      return 'text-[var(--ty-lavender,#b598ff)] bg-[var(--ty-surface-raised)] border-[var(--ty-border)]';
+      return 'text-[#5C528B] dark:text-[#B598FF] bg-[#F3F2F7] dark:bg-[#242133] border border-[#E5E2EE] dark:border-[#35304B]';
     case 'WS':
-      return 'text-[var(--ty-matcha)] bg-[var(--ty-matcha-soft)] border-[var(--ty-matcha)]/40 font-semibold';
+      return 'text-[#4D7C5D] dark:text-[#6FAD84] bg-[#F0F5F1] dark:bg-[#1F2B23] border border-[#DEEAE2] dark:border-[#2D3F33] font-semibold';
     default:
-      return 'text-[var(--ty-text-muted)] bg-[var(--ty-surface-raised)] border-[var(--ty-border)]';
+      return 'text-[#6B7280] dark:text-[#A8A096] bg-black/5 dark:bg-white/5 border border-transparent';
   }
 };
 
@@ -207,10 +207,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             key={node.path}
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
             onClick={() => onSelectFile(node.path)}
-            className={`group flex items-center justify-between h-7 pr-2 rounded-[var(--ty-radius-xs,4px)] text-xs cursor-pointer transition-colors ${
+            className={`group flex items-center justify-between h-7 pr-2 rounded-[var(--ty-radius-xs,4px)] text-xs cursor-pointer transition-all ${
               isSelected
-                ? 'bg-[var(--ty-surface-raised)] text-[var(--ty-text)] font-semibold shadow-xs border-l-2 border-[var(--ty-matcha)]'
-                : 'text-[var(--ty-text-muted)] hover:bg-[var(--ty-surface-raised)]/60 hover:text-[var(--ty-text)]'
+                ? 'bg-white dark:bg-[var(--ty-surface-raised)] text-[var(--ty-text)] font-semibold shadow-xs border border-[#EFEBE4] dark:border-[#33353A] border-l-3 border-l-[var(--ty-matcha)]'
+                : 'text-[var(--ty-text-muted)] hover:bg-white/60 dark:hover:bg-[var(--ty-surface-raised)]/60 hover:text-[var(--ty-text)]'
             }`}
           >
             <div className="flex items-center gap-1.5 truncate">
@@ -269,9 +269,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <aside className="w-64 bg-[var(--ty-surface)] border-r border-[var(--ty-border)] flex flex-col h-full shrink-0 select-none">
+    <aside className="w-64 bg-[var(--ty-nav-bg)] border-r border-[var(--ty-border)] flex flex-col h-full shrink-0 select-none">
       {/* Top Tabs (32px) */}
-      <div className="h-8 flex items-center border-b border-[var(--ty-border)] px-2 gap-1 bg-[var(--ty-surface)]">
+      <div className="h-8 flex items-center border-b border-[var(--ty-border)] px-2 gap-1 bg-[var(--ty-nav-bg)]">
         <button
           onClick={() => setActiveTab('collections')}
           className={`flex items-center gap-1.5 px-2.5 h-full text-xs font-medium border-b-2 transition-colors ${
@@ -297,7 +297,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Search and Action Bar */}
-      <div className="p-2 border-b border-[var(--ty-border)] flex flex-col gap-1.5">
+      <div className="p-2 border-b border-[var(--ty-border)] flex flex-col gap-1.5 bg-[var(--ty-nav-bg)]">
         <div className="relative">
           <Search className="w-3 h-3 text-[var(--ty-text-subtle)] absolute left-2 top-2 pointer-events-none" />
           <input
@@ -305,7 +305,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="搜索接口、方法或路径..."
-            className="w-full bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] rounded-[var(--ty-radius-xs,4px)] pl-7 pr-6 py-1 text-xs text-[var(--ty-text)] placeholder-[var(--ty-text-subtle)] focus:outline-none focus:border-[var(--ty-matcha)] transition-colors"
+            className="w-full bg-white dark:bg-[var(--ty-surface-sunken)] border border-[var(--ty-border)] rounded-[var(--ty-radius-xs,4px)] pl-7 pr-6 py-1 text-xs text-[var(--ty-text)] placeholder-[var(--ty-text-subtle)] focus:outline-none focus:border-[var(--ty-matcha)] shadow-2xs transition-colors"
           />
           {searchQuery && (
             <button
@@ -415,7 +415,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Bottom info bar */}
-      <div className="h-6 px-2.5 border-t border-[var(--ty-border)] bg-[var(--ty-surface)] text-[10px] text-[var(--ty-text-subtle)] flex items-center justify-between shrink-0">
+      <div className="h-6 px-2.5 border-t border-[var(--ty-border)] bg-[var(--ty-nav-bg)] text-[10px] text-[var(--ty-text-subtle)] flex items-center justify-between shrink-0">
         <div className="flex items-center gap-1 text-[var(--ty-text-muted)] font-mono">
           <GitBranch className="w-3 h-3 text-[var(--ty-matcha)]" />
           <span>Git 纯文本跟踪</span>

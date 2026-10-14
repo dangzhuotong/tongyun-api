@@ -11,6 +11,8 @@ pub fn start_bridge_server(app: AppHandle, port: u16) {
         "active_request": null,
         "last_response": null,
         "test_results": null,
+        "telemetry": null,
+        "human_feedback": null,
         "updated_at": 0
     })));
 
@@ -67,7 +69,7 @@ pub fn start_bridge_server(app: AppHandle, port: u16) {
 
                 // 1. 状态检查
                 if path == "/api/status" || path == "/" {
-                    let payload = r#"{"status":"ready","app":"tongyun-api","version":"0.1.0","message":"AI Skill Bridge 运行就绪","endpoints":["/api/status","/api/state","/api/push","/api/send","/api/run-cases","/api/sync"]}"#;
+                    let payload = r#"{"status":"ready","app":"tongyun-api","version":"0.1.0","message":"AI Skill Bridge 运行就绪","endpoints":["/api/status","/api/state","/api/push","/api/send","/api/run-cases","/api/telemetry","/api/thought","/api/feedback","/api/sync"]}"#;
                     let resp = format!("HTTP/1.1 200 OK\r\n{}Content-Length: {}\r\n\r\n{}", cors_headers, payload.len(), payload);
                     let _ = socket.write_all(resp.as_bytes()).await;
                     return;
@@ -99,6 +101,9 @@ pub fn start_bridge_server(app: AppHandle, port: u16) {
                                 }
                                 if let Some(tests) = json_val.get("test_results") {
                                     obj.insert("test_results".to_string(), tests.clone());
+                                }
+                                if let Some(feedback) = json_val.get("human_feedback") {
+                                    obj.insert("human_feedback".to_string(), feedback.clone());
                                 }
                                 obj.insert("updated_at".to_string(), serde_json::json!(chrono::Utc::now().timestamp_millis()));
                             }
@@ -147,7 +152,56 @@ pub fn start_bridge_server(app: AppHandle, port: u16) {
                     return;
                 }
 
-                let not_found = r#"{"error":"Not Found","endpoints":["/api/status", "/api/state", "/api/push", "/api/send", "/api/run-cases", "/api/sync"]}"#;
+                // 7. 投屏 Agent 思考过程与态势 (Telemetry / Thought)
+                if (path == "/api/telemetry" || path == "/api/thought") && method == "POST" {
+                    if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(body) {
+                        let _ = app_clone.emit("ai-bridge-telemetry", &json_val);
+                        {
+                            let mut lock = state_clone.lock().unwrap();
+                            if let Some(obj) = lock.as_object_mut() {
+                                obj.insert("telemetry".to_string(), json_val.clone());
+                                obj.insert("updated_at".to_string(), serde_json::json!(chrono::Utc::now().timestamp_millis()));
+                            }
+                        }
+                        let payload = r#"{"ok":true,"message":"Agent 思考过程与态势已实时投屏至桌面 HUD"}"#;
+                        let resp = format!("HTTP/1.1 200 OK\r\n{}Content-Length: {}\r\n\r\n{}", cors_headers, payload.len(), payload);
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                        return;
+                    }
+                }
+
+                // 8. 人类反馈通道 (Human-in-the-Loop Feedback: 供 Agent 读取人类在 UI 上给出的裁决/指令)
+                if path == "/api/feedback" && method == "GET" {
+                    let feedback_val = {
+                        let lock = state_clone.lock().unwrap();
+                        lock.get("human_feedback").cloned().unwrap_or(serde_json::Value::Null)
+                    };
+                    let payload = serde_json::to_string(&serde_json::json!({
+                        "ok": true,
+                        "feedback": feedback_val
+                    })).unwrap_or_else(|_| "{}".to_string());
+                    let resp = format!("HTTP/1.1 200 OK\r\n{}Content-Length: {}\r\n\r\n{}", cors_headers, payload.len(), payload);
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                    return;
+                }
+
+                if path == "/api/feedback" && method == "POST" {
+                    if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(body) {
+                        {
+                            let mut lock = state_clone.lock().unwrap();
+                            if let Some(obj) = lock.as_object_mut() {
+                                obj.insert("human_feedback".to_string(), json_val.clone());
+                                obj.insert("updated_at".to_string(), serde_json::json!(chrono::Utc::now().timestamp_millis()));
+                            }
+                        }
+                        let payload = r#"{"ok":true,"message":"人类反馈已保存到 Bridge"}"#;
+                        let resp = format!("HTTP/1.1 200 OK\r\n{}Content-Length: {}\r\n\r\n{}", cors_headers, payload.len(), payload);
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                        return;
+                    }
+                }
+
+                let not_found = r#"{"error":"Not Found","endpoints":["/api/status", "/api/state", "/api/push", "/api/send", "/api/run-cases", "/api/telemetry", "/api/thought", "/api/feedback", "/api/sync"]}"#;
                 let resp = format!("HTTP/1.1 404 Not Found\r\n{}Content-Length: {}\r\n\r\n{}", cors_headers, not_found.len(), not_found);
                 let _ = socket.write_all(resp.as_bytes()).await;
             });

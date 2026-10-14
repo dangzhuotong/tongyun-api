@@ -109,6 +109,64 @@ def trigger_run_cases():
         print(f"❌ [触发失败] 无法触发用例执行: {e}")
         return None
 
+def push_telemetry(payload):
+    """向桌面 HUD 投屏 Agent 的思考、假设与任务态势"""
+    url = f"{BRIDGE_BASE_URL}/api/telemetry"
+    data_bytes = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=data_bytes,
+        headers={"Content-Type": "application/json; charset=utf-8"},
+        method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=3.0) as resp:
+            res_json = json.loads(resp.read().decode("utf-8"))
+            agent = payload.get("agent", "Agent")
+            thought = payload.get("thought", "")
+            print(f"🧠 [HUD投屏成功] {agent}: {thought[:60]}... 已实时投屏至桌面 HUD！")
+            return res_json
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            payload_copy = dict(payload)
+            payload_copy["action"] = "telemetry"
+            return push_request(payload_copy)
+        print(f"❌ [HUD投屏失败] HTTP {e.code}: {e.reason}")
+        return None
+    except Exception as e:
+        print(f"❌ [HUD投屏失败] 无法连接到桌面应用: {e}")
+        return None
+
+def get_feedback():
+    """获取人类在桌面 UI 上给出的裁决、批注或下一步指令"""
+    url = f"{BRIDGE_BASE_URL}/api/feedback"
+    try:
+        req = urllib.request.Request(url, method="GET")
+        with urllib.request.urlopen(req, timeout=2.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            feedback = data.get("feedback")
+            if feedback:
+                print(f"💬 [人类反馈就绪]:")
+                print(json.dumps(feedback, ensure_ascii=False, indent=2))
+            else:
+                print(f"☕ [暂无人类新反馈] 人类正在观察监视屏，未提出新干预指令。")
+            return feedback
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            state = get_state()
+            feedback = state.get("human_feedback") if state else None
+            if feedback:
+                print(f"💬 [人类反馈就绪 (来自状态快照)]:")
+                print(json.dumps(feedback, ensure_ascii=False, indent=2))
+            else:
+                print(f"☕ [暂无人类新反馈] 人类正在观察监视屏，未提出新干预指令。")
+            return feedback
+        print(f"❌ [获取人类反馈失败] HTTP {e.code}: {e.reason}")
+        return None
+    except Exception as e:
+        print(f"❌ [获取人类反馈失败]: {e}")
+        return None
+
 def main():
     parser = argparse.ArgumentParser(description="橦云接口 UI AI 联动客户端 (供外部 AI Agent 调度)")
     subparsers = parser.add_subparsers(dest="command", help="子命令")
@@ -135,7 +193,22 @@ def main():
     push_p.add_argument("--body", type=str, help="请求体字符串或 JSON")
     push_p.add_argument("--test", action="append", help="测试断言，例如 'status: 200' 或 'contains: ok'")
     push_p.add_argument("--cases-file", type=str, help="测试用例 JSON 文件路径")
+    push_p.add_argument("--agent", type=str, default="Antigravity", help="Agent 名称 (如 Antigravity, Cursor, Claude)")
+    push_p.add_argument("--task", type=str, help="当前任务描述 (如 '支付接口逆向测试')")
+    push_p.add_argument("--thought", type=str, help="AI 思考与意图说明 (投屏至桌面 HUD)")
+    push_p.add_argument("--step", type=str, help="当前步骤 (如 'Step 2/5')")
     push_p.add_argument("--send", action="store_true", help="推送后自动触发立即执行发送")
+
+    # thought (向桌面 HUD 投屏思考与任务进度)
+    thought_p = subparsers.add_parser("thought", help="向桌面 HUD 投屏 Agent 当前的思考与态势")
+    thought_p.add_argument("thought", type=str, help="AI 思考内容或推理逻辑")
+    thought_p.add_argument("--agent", type=str, default="Antigravity", help="Agent 名称")
+    thought_p.add_argument("--task", type=str, help="当前执行的任务")
+    thought_p.add_argument("--step", type=str, help="执行步骤 (如 'Step 3/5')")
+    thought_p.add_argument("--status", type=str, default="running", choices=["running", "success", "error", "idle"], help="运行状态")
+
+    # feedback (读取人类在桌面 UI 上留给 Agent 的反馈或裁决)
+    subparsers.add_parser("feedback", help="读取人类在桌面 UI 上留下的裁决与反馈")
 
     # add-case (向当前激活接口追加测试用例)
     case_p = subparsers.add_parser("add-case", help="向当前激活接口追加测试用例")
@@ -143,6 +216,7 @@ def main():
     case_p.add_argument("--category", type=str, default="positive", choices=["positive", "negative", "boundary", "security"], help="用例类别")
     case_p.add_argument("--body", type=str, help="用例请求体")
     case_p.add_argument("--test", action="append", help="用例断言，如 'status: 401'")
+    case_p.add_argument("--thought", type=str, help="此用例的推导思考")
 
     # json (直接传入完整 JSON)
     json_p = subparsers.add_parser("json", help="以完整 JSON 格式推送接口")
@@ -165,6 +239,22 @@ def main():
 
     if args.command == "run-cases":
         trigger_run_cases()
+        return
+
+    if args.command == "thought":
+        payload = {
+            "agent": args.agent,
+            "task": args.task,
+            "thought": args.thought,
+            "step": args.step,
+            "status": args.status,
+            "timestamp": int(os.path.getmtime(__file__) if False else 0)
+        }
+        push_telemetry(payload)
+        return
+
+    if args.command == "feedback":
+        get_feedback()
         return
 
     if args.command == "add-case":
@@ -270,6 +360,10 @@ def main():
             "body": args.body or "",
             "tests": tests,
             "cases": cases,
+            "agent": args.agent,
+            "task": args.task,
+            "thought": args.thought,
+            "step": args.step,
             "autoSend": args.send
         }
         push_request(payload)

@@ -14,6 +14,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose 
       category: '🚀 请求调试与发送',
       items: [
         { keys: ['Ctrl', 'Enter'], desc: '立即发送当前接口请求' },
+        { keys: ['Ctrl', 'E'], desc: '循环切换下一个环境并即刻重放 (Hot-Replay)' },
         { keys: ['Ctrl', 'S'], desc: '将当前请求保存为纯文本 .http 文件 (Git 跟踪)' },
         { keys: ['Ctrl', 'Alt', 'L'], desc: '一键格式化与美化 JSON 请求体' },
       ],

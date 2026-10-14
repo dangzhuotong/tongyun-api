@@ -114,25 +114,25 @@ export const JsonCodeEditor: React.FC<JsonCodeEditorProps> = ({
 
       switch (token.type) {
         case 'key':
-          colorClass = 'text-sky-400 font-medium';
+          colorClass = 'text-[var(--ty-token-key)] font-medium';
           break;
         case 'string':
-          colorClass = 'text-emerald-400';
+          colorClass = 'text-[var(--ty-token-string)]';
           break;
         case 'number':
-          colorClass = 'text-amber-400 font-mono';
+          colorClass = 'text-[var(--ty-token-number)] font-mono font-semibold';
           break;
         case 'boolean':
-          colorClass = 'text-purple-400 font-bold';
+          colorClass = 'text-[var(--ty-token-boolean)] font-bold';
           break;
         case 'null':
-          colorClass = 'text-slate-400 italic';
+          colorClass = 'text-[var(--ty-token-null)] italic';
           break;
         case 'variable':
-          colorClass = 'text-emerald-300 font-semibold bg-emerald-950/40 px-1 py-0.5 rounded border border-emerald-500/30';
+          colorClass = 'text-[var(--ty-token-variable)] font-semibold bg-[var(--ty-token-var-bg)] px-1 py-0.5 rounded border border-[var(--ty-token-variable)]/30';
           break;
         case 'punctuation':
-          colorClass = 'text-slate-400';
+          colorClass = 'text-[var(--ty-token-punctuation)]';
           break;
         default:
           colorClass = 'text-[var(--ty-text)]';
@@ -149,11 +149,11 @@ export const JsonCodeEditor: React.FC<JsonCodeEditorProps> = ({
 
   return (
     <div
-      className="flex-1 flex flex-col border border-[var(--ty-border)] rounded-[var(--ty-radius-sm)] bg-[var(--ty-surface-sunken)] overflow-hidden font-mono text-xs relative group focus-within:border-[var(--ty-matcha)] shadow-inner transition-all"
+      className="flex-1 flex flex-col border border-[var(--ty-border)] rounded-[var(--ty-radius-md)] bg-white dark:bg-[var(--ty-surface)] overflow-hidden font-mono text-xs relative group focus-within:border-[var(--ty-matcha)] shadow-xs transition-all"
       style={{ minHeight }}
     >
       {/* Editor Top Toolbar */}
-      <div className="h-7 px-2.5 bg-[var(--ty-surface-raised)]/60 border-b border-[var(--ty-border)]/60 flex items-center justify-between text-[11px] text-[var(--ty-text-subtle)] shrink-0 select-none">
+      <div className="h-7.5 px-3 bg-[#FAF8F5] dark:bg-[var(--ty-surface-raised)] border-b border-[var(--ty-border)] flex items-center justify-between text-[11px] text-[var(--ty-text-subtle)] shrink-0 select-none">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-[var(--ty-text-muted)] text-[10px] tracking-wider uppercase">JSON Payload</span>
           <span className="text-[var(--ty-border-strong)]">|</span>
@@ -166,7 +166,7 @@ export const JsonCodeEditor: React.FC<JsonCodeEditorProps> = ({
           <button
             onClick={handleFormat}
             title="美化格式 (Ctrl+Alt+L)"
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-[var(--ty-surface)] text-[var(--ty-matcha)] hover:text-[var(--ty-matcha-hover)] transition-colors"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-white dark:hover:bg-[var(--ty-surface-raised)] text-[var(--ty-matcha)] hover:text-[var(--ty-matcha-hover)] transition-colors cursor-pointer"
           >
             <Wand2 className="w-3 h-3" />
             <span>美化</span>
@@ -174,7 +174,7 @@ export const JsonCodeEditor: React.FC<JsonCodeEditorProps> = ({
           <button
             onClick={handleMinify}
             title="压缩成单行"
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-[var(--ty-surface)] text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-white dark:hover:bg-[var(--ty-surface-raised)] text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors cursor-pointer"
           >
             <Minimize2 className="w-3 h-3" />
             <span>压缩</span>
@@ -182,7 +182,7 @@ export const JsonCodeEditor: React.FC<JsonCodeEditorProps> = ({
           <button
             onClick={handleCopy}
             title="复制请求体"
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-[var(--ty-surface)] text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-white dark:hover:bg-[var(--ty-surface-raised)] text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors cursor-pointer"
           >
             {copied ? <Check className="w-3 h-3 text-[var(--ty-matcha)]" /> : <Copy className="w-3 h-3" />}
             <span>{copied ? '已复制' : '复制'}</span>
@@ -191,11 +191,11 @@ export const JsonCodeEditor: React.FC<JsonCodeEditorProps> = ({
       </div>
 
       {/* Editor Main Canvas Body */}
-      <div className="flex-1 flex overflow-hidden relative min-h-0">
+      <div className="flex-1 flex overflow-hidden relative min-h-0 bg-white dark:bg-[var(--ty-surface)]">
         {/* IntelliJ Line Number Gutter */}
         <div
           ref={gutterRef}
-          className="w-11 shrink-0 py-2.5 pr-2 pl-1 select-none text-right font-mono text-[11px] text-[var(--ty-text-subtle)] bg-[var(--ty-surface-raised)]/20 border-r border-[var(--ty-border)]/50 overflow-hidden leading-relaxed"
+          className="w-11 shrink-0 py-2.5 pr-2 pl-1 select-none text-right font-mono text-[11px] text-[var(--ty-text-subtle)] bg-[#FAF8F5]/80 dark:bg-[var(--ty-surface-raised)]/20 border-r border-[var(--ty-border)] overflow-hidden leading-relaxed"
         >
           {Array.from({ length: lineCount }).map((_, idx) => {
             const lineNum = idx + 1;
@@ -240,13 +240,13 @@ export const JsonCodeEditor: React.FC<JsonCodeEditorProps> = ({
             autoComplete="off"
             autoCorrect="off"
             placeholder={placeholder}
-            className="absolute inset-0 w-full h-full p-2.5 m-0 font-mono text-xs leading-relaxed whitespace-pre bg-transparent text-transparent caret-emerald-400 outline-none border-0 resize-none z-10 selection:bg-sky-500/30 selection:text-transparent"
+            className="absolute inset-0 w-full h-full p-2.5 m-0 font-mono text-xs leading-relaxed whitespace-pre bg-transparent text-transparent caret-[var(--ty-matcha)] outline-none border-0 resize-none z-10 selection:bg-[var(--ty-matcha-soft)]/50 selection:text-transparent"
           />
         </div>
       </div>
 
       {/* Editor Bottom Micro Status Strip */}
-      <div className="h-5 px-2 bg-[var(--ty-surface-raised)]/30 border-t border-[var(--ty-border)]/40 flex items-center justify-between text-[10px] text-[var(--ty-text-subtle)] shrink-0 select-none font-mono">
+      <div className="h-5 px-2.5 bg-[#FAF8F5]/60 dark:bg-[var(--ty-surface-raised)]/30 border-t border-[var(--ty-border)] flex items-center justify-between text-[10px] text-[var(--ty-text-subtle)] shrink-0 select-none font-mono">
         <div className="flex items-center gap-2">
           <span>行 {cursorLine}, 列 {cursorCol}</span>
         </div>
@@ -255,7 +255,7 @@ export const JsonCodeEditor: React.FC<JsonCodeEditorProps> = ({
           <span>·</span>
           <span>UTF-8</span>
           <span>·</span>
-          <span className="text-[var(--ty-matcha)]">JSON</span>
+          <span className="text-[var(--ty-matcha)] font-semibold">JSON</span>
         </div>
       </div>
     </div>
