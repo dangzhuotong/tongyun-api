@@ -1,0 +1,19 @@
+# 鉴权与请求头示例，只访问 httpbin.org。不要把真实密钥写进这个文件。
+
+### Bearer 令牌鉴权
+GET {{host}}/bearer
+Accept: application/json
+Authorization: Bearer {{token}}
+X-Demo-Env: {{envName}}
+
+### 自定义请求头回显
+GET {{host}}/headers
+Accept: application/json
+X-Client-Name: {{name}}
+X-Demo-Env: {{envName}}
+X-Source: {{meta.source}}
+
+### 基本鉴权测试
+GET {{host}}/basic-auth/tongyun/public-placeholder
+Accept: application/json
+Authorization: Basic dG9uZ3l1bjpwdWJsaWMtcGxhY2Vob2xkZXI=

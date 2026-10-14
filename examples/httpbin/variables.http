@@ -1,0 +1,23 @@
+# 环境变量多层替换与路径传参示例，只访问 httpbin.org。
+
+### 嵌套变量与查询参数
+GET {{host}}/get?source={{meta.source}}&user={{name}}&env={{envName}}
+Accept: application/json
+X-Origin-Env: {{envName}}
+
+### 请求体多处插值
+POST {{host}}/post
+Content-Type: application/json
+X-Token: {{token}}
+
+{
+  "client": "{{name}}",
+  "env": "{{envName}}",
+  "meta": {
+    "source": "{{meta.source}}"
+  }
+}
+
+### 状态码路径参数
+GET {{host}}/status/200?check={{name}}
+Accept: application/json

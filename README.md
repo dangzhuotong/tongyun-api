@@ -29,7 +29,10 @@ tongyun-api/
 │   ├── http-client.private.env.json.example # 私有变量模板
 │   └── httpbin/
 │       ├── basics.http                      # GET / POST 基础请求
-│       └── methods.http                     # 各 HTTP 动词示例
+│       ├── methods.http                     # 各 HTTP 动词与状态码示例
+│       ├── headers-auth.http                # 鉴权与请求头示例
+│       ├── json-body.http                   # JSON 请求体与增删改示例
+│       └── variables.http                   # 环境变量多层替换与插值示例
 ├── tongyun-collections/                     # 本地纯文本 JSON 接口集
 │   ├── environments/                        # 环境配置 (development / production)
 │   ├── 01-基础HTTP/
@@ -52,33 +55,83 @@ tongyun-api/
 
 ---
 
+## 📖 示例 (Examples)
+
+仓库在 `examples/` 目录下提供了遵循 **IntelliJ HTTP Client (`.http`)** 规范的纯文本样例，所有示例接口均使用公开的中立沙箱 `https://httpbin.org`，无需启动额外后端即可直接调试。
+
+### 1. 示例文件清单
+
+- **`examples/httpbin/basics.http`**：基础 GET / POST 请求、URL 查询参数拼装与请求头回显。
+- **`examples/httpbin/methods.http`**：状态码校验（200 / 404）、URL-encoded 表单提交、前置与响应处理脚本隔离说明。
+- **`examples/httpbin/headers-auth.http`**：Bearer Token 令牌鉴权、自定义请求头回显及 Basic 基础认证演示。
+- **`examples/httpbin/json-body.http`**：POST（新建资源）、PUT（全量更新）、PATCH（局部变更）等标准 JSON 载荷提交。
+- **`examples/httpbin/variables.http`**：`{{host}}`、`{{envName}}`、`{{meta.source}}` 等多层环境变量在 URL、Header 与 Body 中的插值替换。
+
+### 2. 环境配置与安全隔离
+
+- **`examples/http-client.env.json`**：公共非敏感环境配置，包含 `httpbin`（公网测试）与 `local`（本机调试）两套预设环境。
+- **`examples/http-client.private.env.json.example`**：私有敏感环境模板（用于存放本机 Token、Cookie、真实 Host 等）。
+- **层级继承规则**：每个 `.http` 文件仅继承从根目录到该文件所在目录链路上的环境文件；同一目录内 `private` 覆盖 `public`，子目录环境覆盖父目录同名变量。
+- **安全约定**：私有文件 `*.private.env.json` 已在 `.gitignore` 中忽略，绝对不要将内部真实域名、真实凭据提交至公共仓库。
+
+---
+
 ## 🚀 本地运行与构建
 
 ### 1. 安装依赖
 
 ```bash
-pnpm install
+npm install
 ```
 
 ### 2. 启动桌面应用开发模式（原生网络能力）
 
 ```bash
-pnpm tauri dev
+npm run tauri dev
 ```
 
 ### 3. 仅启动浏览器预览
 
 ```bash
-pnpm dev
+npm run dev
 ```
 
-### 4. 运行完整工程检查（解析器测试、类型检查、Rust 检查）
+---
+
+## 🧪 运行测试 (Running Tests)
+
+本项目使用 [Vitest](https://vitest.dev/) 执行纯文本解析层与工具函数的自动化单测。测试文件与被测模块同级放置（`xxx.test.ts`），只测当前真实行为。
+
+### 1. 执行单元测试
+
+在仓库根目录执行：
 
 ```bash
-pnpm test          # 运行 Vitest 测试 .http 解析器与环境合并
-pnpm build         # 前端构建检查
-cargo check --manifest-path src-tauri/Cargo.toml
+npm test
 ```
+
+该命令将调用 `vitest run`，执行以下测试套件：
+- **`src/parser/parser.test.ts`**：`.http` 语法解析规范、边界容错与 `examples/` 示例在 `httpbin` 环境下的解析验证。
+- **`src/parser/env.test.ts`**：环境变量对象扁平化（`flattenVariables`）与多层公私环境文件合并（`mergeEnvironmentLayers`）。
+- **`src/parser/substitute.test.ts`**：静态变量插值、系统动态变量生成（`$uuid`、`$timestamp` 等）及敏感密钥掩码脱敏（`maskSecret`）。
+- **`src/utils/curl.test.ts`**：cURL 文本插值（`interpolateText`）、请求转 cURL（`exportToCurl`）及 cURL 命令逆向解析（`parseCurl`）。
+- **`src/utils/codeGenerators.test.ts`**：8 种主流语言与框架（cURL、JS Fetch/Axios、TS Fetch、Python Requests/HTTPX、Go、Rust Reqwest）的代码片段生成。
+- **`src/utils/importers.test.ts`**：Postman Collection v2.1、OpenAPI 3.0 / Swagger 与 `.http` 文件的生态导入解析。
+- **`src/utils/tester.test.ts`**：深层 JSON 属性获取（`getNestedValue`）、断言判定引擎（`evaluateAssertions`）、变量提取（`extractVariables`）、智能断言与工业级测试用例集生成。
+
+### 2. 完整工程检查
+
+在提交改动前，建议运行全量工程检查，确保类型检查、单元测试与 Rust 后端检查全部通过：
+
+```bash
+npm run check
+```
+
+该命令依次执行：
+1. `npm run typecheck`：`tsc --noEmit` 前端类型检查
+2. `npm run test`：Vitest 前端解析器与工具函数单测
+3. `npm run check:rust`：`cargo check` Tauri Rust 后端语法检查
+4. `npm run test:rust`：`cargo test` 后端目录扫描与请求调度测试
 
 ---
 
