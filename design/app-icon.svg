@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Warm milk-tea background vertical linear gradient -->
+    <linearGradient id="milkTeaBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F3E3CC"/>
+      <stop offset="100%" stop-color="#E6CFAE"/>
+    </linearGradient>
+  </defs>
+
+  <!-- macOS App Icon Base Squircle -->
+  <rect x="100" y="100" width="824" height="824" rx="200" fill="url(#milkTeaBg)" stroke="#DCC3A0" stroke-width="2"/>
+
+  <!-- Tongyun Cloud (Lower Part, Cream #FCF4E1) -->
+  <g id="cloud" fill="#FCF4E1">
+    <rect x="287" y="610" width="450" height="135" rx="67.5"/>
+    <circle cx="377" cy="610" r="90"/>
+    <circle cx="472" cy="595" r="126"/>
+    <circle cx="572" cy="605" r="103.5"/>
+    <circle cx="635" cy="620" r="63"/>
+    <circle cx="678.5" cy="630" r="58.5"/>
+  </g>
+
+  <!-- Centered Curly Braces { } (Matcha Green #557F45) -->
+  <!-- Left Brace { -->
+  <path d="M 395 280
+           C 360 280, 335 305, 335 335
+           L 335 425
+           C 335 455, 305 470, 270 480
+           C 305 490, 335 505, 335 535
+           L 335 625
+           C 335 655, 360 680, 395 680"
+        fill="none"
+        stroke="#557F45"
+        stroke-width="60"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <!-- Right Brace } -->
+  <path d="M 629 280
+           C 664 280, 689 305, 689 335
+           L 689 425
+           C 689 455, 719 470, 754 480
+           C 719 490, 689 505, 689 535
+           L 689 625
+           C 689 655, 664 680, 629 680"
+        fill="none"
+        stroke="#557F45"
+        stroke-width="60"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <!-- Send Request Arrow (Peach Red #EF8F7B) -->
+  <!-- Arrow Shaft -->
+  <line x1="420" y1="530" x2="575" y2="375"
+        stroke="#EF8F7B"
+        stroke-width="60"
+        stroke-linecap="round"/>
+
+  <!-- Arrow Head -->
+  <path d="M 470 350 L 600 350 L 600 480"
+        fill="none"
+        stroke="#EF8F7B"
+        stroke-width="60"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+</svg>
