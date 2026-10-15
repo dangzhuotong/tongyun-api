@@ -100,38 +100,75 @@ npm run dev
 
 ## 🧪 运行测试 (Running Tests)
 
-本项目使用 [Vitest](https://vitest.dev/) 执行纯文本解析层与工具函数的自动化单测。测试文件与被测模块同级放置（`xxx.test.ts`），只测当前真实行为。
+本项目采用**分层测试架构**，前端使用 [Vitest](https://vitest.dev/) 执行纯文本解析层与断言工具函数的单元测试，后端使用 Rust `cargo test` 验证目录安全扫描与请求调度。测试文件与被测模块同级放置（`xxx.test.ts`），纯内存执行且无外部网络依赖。
 
-### 1. 执行单元测试
+### 1. 常用测试命令
 
-在仓库根目录执行：
+| 测试目的 | 执行命令 | 说明 |
+|---|---|---|
+| **全量前端单测** | `npm test` | 调用 `vitest run` 执行所有前端单测 |
+| **单文件针对性测试** | `npm test -- src/parser/parser.test.ts` | 针对单个测试套件进行快速调试与验证 |
+| **后端 Rust 单测** | `npm run test:rust` | 执行后端目录扫描、安全策略与请求调度测试 |
+| **全量工程门禁** | `npm run check` | 依次执行类型检查、前端单测、Rust 语法检查与 Rust 单测 |
 
-```bash
-npm test
-```
+### 2. 前端测试套件覆盖
 
-该命令将调用 `vitest run`，执行以下测试套件：
-- **`src/parser/parser.test.ts`**：`.http` 语法解析规范、边界容错与 `examples/` 示例在 `httpbin` 环境下的解析验证。
-- **`src/parser/env.test.ts`**：环境变量对象扁平化（`flattenVariables`）与多层公私环境文件合并（`mergeEnvironmentLayers`）。
+- **`src/parser/parser.test.ts`**：`.http` 语法规范解析、请求分割、注释过滤与 `examples/` 示例在 `httpbin` 环境下的解析验证。
+- **`src/parser/env.test.ts`**：环境变量对象扁平化（`flattenVariables`）与多层公私环境文件就近合并（`mergeEnvironmentLayers`）。
 - **`src/parser/substitute.test.ts`**：静态变量插值、系统动态变量生成（`$uuid`、`$timestamp` 等）及敏感密钥掩码脱敏（`maskSecret`）。
 - **`src/utils/curl.test.ts`**：cURL 文本插值（`interpolateText`）、请求转 cURL（`exportToCurl`）及 cURL 命令逆向解析（`parseCurl`）。
 - **`src/utils/codeGenerators.test.ts`**：8 种主流语言与框架（cURL、JS Fetch/Axios、TS Fetch、Python Requests/HTTPX、Go、Rust Reqwest）的代码片段生成。
 - **`src/utils/importers.test.ts`**：Postman Collection v2.1、OpenAPI 3.0 / Swagger 与 `.http` 文件的生态导入解析。
-- **`src/utils/tester.test.ts`**：深层 JSON 属性获取（`getNestedValue`）、断言判定引擎（`evaluateAssertions`）、变量提取（`extractVariables`）、智能断言与工业级测试用例集生成。
+- **`src/utils/tester.test.ts`**：深层 JSON 属性获取（`getNestedValue`）、断言判定引擎（`evaluateAssertions`）、变量提取（`extractVariables`）及测试用例集生成。
 
-### 2. 完整工程检查
+### 3. 虚拟测试示例 (Fictional Examples)
 
-在提交改动前，建议运行全量工程检查，确保类型检查、单元测试与 Rust 后端检查全部通过：
+测试用例与接口样例统一采用中立的虚拟地址（如 `https://httpbin.org` 或 `https://api.example.com`），不依赖真实生产环境。
 
-```bash
-npm run check
+#### 示例 A：`.http` 接口解析与变量插值测试
+```typescript
+// 虚拟示例：验证解析器对变量 {{baseUrl}} 与 {{userId}} 的正确插值
+const rawHttp = `### 获取虚拟用户信息
+GET {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{token}}
+`;
+
+const env = {
+  baseUrl: "https://httpbin.org",
+  userId: "1001",
+  token: "sample-fictional-token",
+};
+
+const parsed = parseHttpFile(rawHttp);
+const resolved = resolveRequest(parsed.requests[0], env);
+expect(resolved.url).toBe("https://httpbin.org/users/1001");
+expect(resolved.headers[0].value).toBe("Bearer sample-fictional-token");
 ```
 
-该命令依次执行：
-1. `npm run typecheck`：`tsc --noEmit` 前端类型检查
-2. `npm run test`：Vitest 前端解析器与工具函数单测
-3. `npm run check:rust`：`cargo check` Tauri Rust 后端语法检查
-4. `npm run test:rust`：`cargo test` 后端目录扫描与请求调度测试
+#### 示例 B：自动化响应断言与变量提取测试
+```typescript
+// 虚拟示例：验证断言引擎判定状态码与从 JSON 响应体提取字段
+const mockResponse = {
+  status: 200,
+  body: JSON.stringify({ code: 0, data: { orderId: "ord_9988", amount: 128.5 } }),
+  time_ms: 85,
+};
+
+// 1. 断言检查：状态码等于 200，耗时小于 500ms
+const assertionResults = evaluateAssertions([
+  { type: "status_code", operator: "equals", expected: "200", enabled: true },
+  { type: "response_time", operator: "less_than", expected: "500", enabled: true },
+], mockResponse);
+expect(assertionResults.every((r) => r.passed)).toBe(true);
+
+// 2. 提取变量：将 data.orderId 存入 extractedOrderId
+const extracted = extractVariables([
+  { source: "json_body", expression: "data.orderId", target_variable: "extractedOrderId", enabled: true },
+], mockResponse);
+expect(extracted.extractedOrderId).toBe("ord_9988");
+```
+
+更完整的测试架构设计、模块映射与测试守则请参阅 [docs/testing.md](docs/testing.md)。
 
 ---
 
