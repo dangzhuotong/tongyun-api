@@ -1,8 +1,14 @@
 name: Build
 
-# Manual unsigned packaging for the public repo. No GitHub Release and no signing secrets.
+# Unsigned packaging for the public repo. No GitHub Release and no signing secrets.
+# Push covers both names: this repo's default branch is master, and main is included
+# so a rename still starts a build.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
 
 permissions:
   contents: read
