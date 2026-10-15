@@ -55,24 +55,89 @@ tongyun-api/
 
 ---
 
-## 📖 示例 (Examples)
+## 📖 示例与用法 (Usage Examples)
 
-仓库在 `examples/` 目录下提供了遵循 **IntelliJ HTTP Client (`.http`)** 规范的纯文本样例，所有示例接口均使用公开的中立沙箱 `https://httpbin.org`，无需启动额外后端即可直接调试。
+仓库在 `examples/` 目录下提供了遵循 **IntelliJ HTTP Client (`.http`)** 规范的纯文本样例，所有示例接口均使用公开的中立沙箱 `https://httpbin.org` 与本地回环地址，开箱即用。
 
-### 1. 示例文件清单
+### 1. 编写 `.http` 请求示例
 
-- **`examples/httpbin/basics.http`**：基础 GET / POST 请求、URL 查询参数拼装与请求头回显。
-- **`examples/httpbin/methods.http`**：状态码校验（200 / 404）、URL-encoded 表单提交、前置与响应处理脚本隔离说明。
-- **`examples/httpbin/headers-auth.http`**：Bearer Token 令牌鉴权、自定义请求头回显及 Basic 基础认证演示。
-- **`examples/httpbin/json-body.http`**：POST（新建资源）、PUT（全量更新）、PATCH（局部变更）等标准 JSON 载荷提交。
-- **`examples/httpbin/variables.http`**：`{{host}}`、`{{envName}}`、`{{meta.source}}` 等多层环境变量在 URL、Header 与 Body 中的插值替换。
+文件以 `###` 分隔请求，支持 `# @name` 自定义命名与 `{{变量名}}` 模板插值：
+
+```http
+### 查询用户信息
+# @name getUser
+GET {{host}}/get?name={{name}}
+Accept: application/json
+X-Demo-Env: {{envName}}
+X-Source: {{meta.source}}
+
+### 提交业务数据
+# @name createRecord
+POST {{host}}/post
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "{{name}}",
+  "client": "tongyun-api",
+  "meta": {
+    "source": "{{meta.source}}"
+  }
+}
+```
 
 ### 2. 环境配置与安全隔离
 
-- **`examples/http-client.env.json`**：公共非敏感环境配置，包含 `httpbin`（公网测试）与 `local`（本机调试）两套预设环境。
-- **`examples/http-client.private.env.json.example`**：私有敏感环境模板（用于存放本机 Token、Cookie、真实 Host 等）。
-- **层级继承规则**：每个 `.http` 文件仅继承从根目录到该文件所在目录链路上的环境文件；同一目录内 `private` 覆盖 `public`，子目录环境覆盖父目录同名变量。
-- **安全约定**：私有文件 `*.private.env.json` 已在 `.gitignore` 中忽略，绝对不要将内部真实域名、真实凭据提交至公共仓库。
+环境配置按目录层级向上查找并合并。嵌套变量通过点号（如 `{{meta.source}}`）访问：
+
+**公共环境 (`http-client.env.json`)** —— 仅存放公开非敏感配置，安全提交至版本库：
+```json
+{
+  "httpbin": {
+    "host": "https://httpbin.org",
+    "name": "tongyun",
+    "envName": "httpbin",
+    "token": "public-placeholder",
+    "meta": {
+      "source": "examples"
+    }
+  },
+  "local": {
+    "host": "http://127.0.0.1:8080",
+    "name": "local",
+    "envName": "local",
+    "token": "local-placeholder",
+    "meta": {
+      "source": "examples"
+    }
+  }
+}
+```
+
+**私有环境 (`http-client.private.env.json`)** —— 存放真实私密凭据，已被 `.gitignore` 忽略：
+```json
+{
+  "httpbin": {
+    "token": "replace-me"
+  }
+}
+```
+
+### 3. 环境继承与安全约定
+
+- **层级继承**：每个 `.http` 文件仅继承自集合根目录到当前文件所在目录链路上的环境配置，同级兄弟目录互不影响。
+- **私有优先**：同一目录内 `private` 覆盖 `public`，深层子目录环境覆盖父目录同名变量。
+- **严格脱敏**：真实域名、私密 Token 严禁提交至公共仓库，示例一律使用 `public-placeholder` 或 `replace-me` 等占位符。
+
+### 4. 示例文件清单
+
+| 文件路径 | 说明 | 演示特性 |
+|---|---|---|
+| `examples/httpbin/basics.http` | 基础请求与参数 | GET / POST、URL 查询参数、请求头回显 |
+| `examples/httpbin/methods.http` | HTTP 动词与状态码 | 200/404 状态校验、表单提交、脚本标记隔离 |
+| `examples/httpbin/headers-auth.http` | 鉴权与认证 | Bearer Token、Basic Auth、自定义请求头 |
+| `examples/httpbin/json-body.http` | 资源增删改 | POST / PUT / PATCH 标准 JSON 载荷 |
+| `examples/httpbin/variables.http` | 多层变量插值 | `{{host}}`、`{{envName}}`、`{{meta.source}}` 多层替换 |
 
 ---
 
