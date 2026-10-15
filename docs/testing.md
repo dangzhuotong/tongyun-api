@@ -49,7 +49,32 @@
 
 ## 2. 如何运行测试
 
-在仓库根目录下执行对应 npm 命令：
+### 2.1 快速执行测试
+
+- **前端单测 (`npm test`)**
+  在仓库根目录下运行：
+  ```bash
+  npm test
+  ```
+  底层调用 `vitest run`，执行 `src/parser/` 下的所有解析规则、环境合并与示例文件回归单测。
+
+- **后端单测 (`cargo test`)**
+  可以通过 Cargo 直接运行或使用项目配置好的 npm 脚本：
+  ```bash
+  # 直接使用 cargo test
+  cargo test --manifest-path src-tauri/Cargo.toml
+
+  # 或进入后端目录执行
+  cd src-tauri && cargo test
+
+  # 或通过 npm 脚本运行
+  npm run test:rust
+  ```
+  执行 `src-tauri/src/` 下的工作区安全扫描、网络请求白名单与重定向过滤等单测。
+
+### 2.2 完整检查命令列表
+
+在仓库根目录下执行对应命令：
 
 | 目的 | 命令 | 底层工具 | 说明 |
 | --- | --- | --- | --- |
@@ -57,7 +82,7 @@
 | **前端类型检查** | `npm run typecheck` | `tsc --noEmit` | 静态类型核验，确保无类型错误 |
 | **前端生产构建** | `npm run build` | `tsc && vite build` | 验证前端能够顺利编译出生产静态文件 |
 | **后端 Rust 检查** | `npm run check:rust` | `cargo check --manifest-path src-tauri/Cargo.toml` | 检查后端代码语法与依赖调用 |
-| **后端 Rust 单测** | `npm run test:rust` | `cargo test --manifest-path src-tauri/Cargo.toml` | 执行后端目录扫描、网络安全性及用例数据单测 |
+| **后端 Rust 单测** | `cargo test --manifest-path src-tauri/Cargo.toml` / `npm run test:rust` | `cargo test` | 执行后端目录扫描、网络安全性及用例数据单测 |
 | **全量自动化流水线** | `npm run check` | 串联所有检查 | 自动化验收前必跑：类型检查 + Vitest + Rust check + Rust test |
 
 ---
