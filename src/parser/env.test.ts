@@ -82,6 +82,34 @@ describe("flattenVariables", () => {
       "nested.keep": "kept",
     });
   });
+
+  it("keeps nested arrays as a JSON string without flattening their items", () => {
+    const input = {
+      auth: {
+        scopes: ["read", "write"],
+      },
+      headers: [{ name: "A" }],
+    };
+    const result = flattenVariables(input);
+    expect(result).toEqual({
+      "auth.scopes": '["read","write"]',
+      headers: '[{"name":"A"}]',
+    });
+  });
+
+  it("stringifies nested numbers and booleans through dot paths", () => {
+    const input = {
+      retry: {
+        enabled: false,
+        count: 3,
+      },
+    };
+    const result = flattenVariables(input);
+    expect(result).toEqual({
+      "retry.enabled": "false",
+      "retry.count": "3",
+    });
+  });
 });
 
 describe("mergeEnvironmentLayers", () => {
@@ -239,5 +267,113 @@ describe("mergeEnvironmentLayers", () => {
       sources: [],
       problems: [],
     });
+  });
+
+  it("lets a nearer layer override variables from a farther layer", () => {
+    const layers: EnvLayer[] = [
+      {
+        path: "root/http-client.env.json",
+        kind: "public",
+        content: JSON.stringify({ dev: { host: "https://outer", timeout: 10 } }),
+      },
+      {
+        path: "root/sub/http-client.env.json",
+        kind: "public",
+        content: JSON.stringify({ dev: { host: "https://inner" } }),
+      },
+    ];
+
+    const result = mergeEnvironmentLayers(layers);
+    expect(result.variables.dev).toEqual({ host: "https://inner", timeout: "10" });
+    expect(result.sources).toEqual([
+      { path: "root/http-client.env.json", kind: "public" },
+      { path: "root/sub/http-client.env.json", kind: "public" },
+    ]);
+    expect(result.problems).toEqual([]);
+  });
+
+  it("introduces environments that only exist in a private layer", () => {
+    const layers: EnvLayer[] = [
+      {
+        path: "http-client.env.json",
+        kind: "public",
+        content: JSON.stringify({ dev: { host: "https://httpbin.org" } }),
+      },
+      {
+        path: "http-client.private.env.json",
+        kind: "private",
+        content: JSON.stringify({ local: { token: "replace-me" } }),
+      },
+    ];
+
+    const result = mergeEnvironmentLayers(layers);
+    expect(result.names).toEqual(["dev", "local"]);
+    expect(result.variables.local).toEqual({ token: "replace-me" });
+    expect(result.privateKeys.local).toEqual(["token"]);
+  });
+
+  it("sorts recorded private keys alphabetically and keeps unrelated public keys private", () => {
+    const layers: EnvLayer[] = [
+      {
+        path: "http-client.env.json",
+        kind: "public",
+        content: JSON.stringify({
+          prod: { host: "https://api", token: "public-placeholder", user: "admin" },
+        }),
+      },
+      {
+        path: "http-client.private.env.json",
+        kind: "private",
+        content: JSON.stringify({
+          prod: { token: "secret", zeta: "z", alpha: "a" },
+        }),
+      },
+    ];
+
+    const result = mergeEnvironmentLayers(layers);
+    expect(result.privateKeys.prod).toEqual(["alpha", "token", "zeta"]);
+  });
+
+  it("keeps a key private when a later private layer re-defines it", () => {
+    const layers: EnvLayer[] = [
+      {
+        path: "a/http-client.env.json",
+        kind: "public",
+        content: JSON.stringify({ dev: { token: "public" } }),
+      },
+      {
+        path: "a/http-client.private.env.json",
+        kind: "private",
+        content: JSON.stringify({ dev: { token: "first-secret" } }),
+      },
+      {
+        path: "a/b/http-client.private.env.json",
+        kind: "private",
+        content: JSON.stringify({ dev: { token: "second-secret" } }),
+      },
+    ];
+
+    const result = mergeEnvironmentLayers(layers);
+    expect(result.variables.dev.token).toBe("second-secret");
+    expect(result.privateKeys.dev).toEqual(["token"]);
+  });
+
+  it("still records sources for layers with problems", () => {
+    const layers: EnvLayer[] = [
+      { path: "broken.env.json", kind: "public", content: "not json" },
+      {
+        path: "http-client.env.json",
+        kind: "public",
+        content: JSON.stringify({ dev: { host: "https://httpbin.org" } }),
+      },
+    ];
+
+    const result = mergeEnvironmentLayers(layers);
+    expect(result.problems).toEqual(["broken.env.json 不是合法 JSON"]);
+    expect(result.sources).toEqual([
+      { path: "broken.env.json", kind: "public" },
+      { path: "http-client.env.json", kind: "public" },
+    ]);
+    expect(result.names).toEqual(["dev"]);
   });
 });
