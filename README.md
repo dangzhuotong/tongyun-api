@@ -98,6 +98,22 @@ npm run dev
 
 ---
 
+## 检查更新
+
+安装版桌面 App 在顶栏点 **检查更新**，状态栏的 **关于** 里也能看到当前版本并再次检查。启动大约 3 秒后会静默检查；已经是最新时，手动检查会提示「已是最新版本」。有新版会下载并重启。
+
+`0.1.0` 没有更新器，需要先从 [Releases](https://github.com/dangzhuotong/tongyun-api/releases/latest) 手动安装一次 `0.2.0`，之后才能在应用内升级。新版本来自 tag `vX.Y.Z`，并且和 `package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 的版本一致。GitHub Actions 在 tag 上发布 Release，并带上更新器用的 `latest.json`。合进 `master` 只会打未签名构建产物，不会发布 Release。步骤见 [docs/RELEASE.md](docs/RELEASE.md)。
+
+安装包在 CI 里用 **minisign** 签过更新包（`TAURI_SIGNING_*`）。**尚未做 Apple 公证**。macOS 首次打开如果提示无法验证开发者：
+
+1. 系统设置 → 隐私与安全性 → 往下找到提示，点「仍要打开」；
+2. 在「应用程序」里右键点 App，选「打开」，再确认一次；
+3. 终端执行：`xattr -dr com.apple.quarantine /Applications/tongyun-api.app`
+
+已经装上的 App 用「检查更新」换的是 minisign 签过的包。
+
+---
+
 ## 🧪 运行测试 (Running Tests)
 
 本项目采用**分层测试架构**，前端使用 [Vitest](https://vitest.dev/) 执行纯文本解析层与断言工具函数的单元测试，后端使用 Rust `cargo test` 验证目录安全扫描与请求调度。测试文件与被测模块同级放置（`xxx.test.ts`），纯内存执行且无外部网络依赖。
@@ -189,3 +205,4 @@ expect(extracted.extractedOrderId).toBe("ord_9988");
 - [AGENTS.md](AGENTS.md)：给 AI Agent 与开发者的代码规范、文件契约与提交守则
 - [docs/PRD.md](docs/PRD.md)：产品需求与设计原则
 - [docs/tasks/001-mvp.md](docs/tasks/001-mvp.md)：MVP 验收项清单
+- [docs/RELEASE.md](docs/RELEASE.md)：桌面 App 发版与检查更新

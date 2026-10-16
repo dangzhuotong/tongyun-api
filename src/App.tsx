@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { GitBranch, FolderTree, Keyboard } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { GitBranch, FolderTree, Info, Keyboard } from 'lucide-react';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { TabBar, TabItem } from './components/TabBar';
@@ -12,6 +12,11 @@ import { GitStatusModal } from './components/GitStatusModal';
 import { AiInspectorModal } from './components/AiInspectorModal';
 import { CollectionRunnerModal } from './components/CollectionRunnerModal';
 import { ShortcutsModal } from './components/ShortcutsModal';
+import { AboutModal } from './components/AboutModal';
+import { UpdateModal } from './components/UpdateModal';
+import { checkForAppUpdate, resolveDisplayedAppVersion, updateCheckNotice } from './updater';
+import type { Update } from '@tauri-apps/plugin-updater';
+import { version as bundledVersion } from '../package.json';
 import { apiClient, GitStatusResult, isTauri } from './services/apiClient';
 import {
   RequestData,
@@ -97,6 +102,12 @@ export const App: React.FC = () => {
   const [isAiInspectorOpen, setIsAiInspectorOpen] = useState<boolean>(false);
   const [isCollectionRunnerOpen, setIsCollectionRunnerOpen] = useState<boolean>(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState<boolean>(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [runtimeVersion, setRuntimeVersion] = useState<string | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [activeUpdate, setActiveUpdate] = useState<Update | null>(null);
+  const checkingUpdateRef = useRef(false);
+  const displayVersion = resolveDisplayedAppVersion(runtimeVersion, bundledVersion);
   const [gitStatus, setGitStatus] = useState<GitStatusResult | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -108,6 +119,52 @@ export const App: React.FC = () => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 2500);
   };
+
+  const handleCheckUpdate = useCallback(async (manual: boolean) => {
+    if (checkingUpdateRef.current) return;
+    checkingUpdateRef.current = true;
+    setCheckingUpdate(true);
+    try {
+      const update = await checkForAppUpdate();
+      if (update) {
+        setActiveUpdate((prev) => {
+          prev?.close().catch(() => {});
+          return update;
+        });
+      } else {
+        const notice = updateCheckNotice(manual, 'latest');
+        if (notice) showToast(notice);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const notice = updateCheckNotice(manual, 'failed', message);
+      if (notice) showToast(notice);
+      else console.warn('[Updater] Silent check skipped/failed:', err);
+    } finally {
+      checkingUpdateRef.current = false;
+      setCheckingUpdate(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    import('@tauri-apps/api/app')
+      .then(({ getVersion }) => getVersion())
+      .then((version) => {
+        if (!cancelled) setRuntimeVersion(version);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void handleCheckUpdate(false);
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [handleCheckUpdate]);
 
   // 当前激活的 Tab
   const activeTab = useMemo(() => {
@@ -1068,6 +1125,8 @@ export const App: React.FC = () => {
         theme={theme}
         onToggleTheme={() => setTheme(t => t === 'planner' ? 'dark' : 'planner')}
         onQuickSwitchEnv={handleQuickSwitchEnvAndReplay}
+        checkingUpdate={checkingUpdate}
+        onCheckUpdate={() => void handleCheckUpdate(true)}
       />
 
       {/* Main Content Layout */}
@@ -1174,6 +1233,15 @@ export const App: React.FC = () => {
 
         <div className="flex items-center gap-3">
           <button
+            onClick={() => setAboutOpen(true)}
+            className="flex items-center gap-1 text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors"
+            title="关于 橦云接口"
+          >
+            <Info className="w-3.5 h-3.5" />
+            <span>关于 v{displayVersion}</span>
+          </button>
+
+          <button
             onClick={() => setIsShortcutsModalOpen(true)}
             className="flex items-center gap-1 text-[var(--ty-text-muted)] hover:text-[var(--ty-text)] transition-colors"
             title="快捷键速查表 (F1 / Ctrl+Alt+K)"
@@ -1266,6 +1334,24 @@ export const App: React.FC = () => {
         isOpen={isShortcutsModalOpen}
         onClose={() => setIsShortcutsModalOpen(false)}
       />
+
+      <AboutModal
+        isOpen={aboutOpen}
+        onClose={() => setAboutOpen(false)}
+        version={displayVersion}
+        checkingUpdate={checkingUpdate}
+        onCheckUpdate={() => void handleCheckUpdate(true)}
+      />
+
+      {activeUpdate && (
+        <UpdateModal
+          update={activeUpdate}
+          onClose={() => {
+            activeUpdate.close().catch(() => {});
+            setActiveUpdate(null);
+          }}
+        />
+      )}
 
       {/* Toast Notification */}
       {toastMessage && (
