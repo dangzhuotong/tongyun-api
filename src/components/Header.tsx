@@ -39,6 +39,8 @@ interface HeaderProps {
   theme: 'planner' | 'dark';
   onToggleTheme: () => void;
   onQuickSwitchEnv?: () => void;
+  checkingUpdate?: boolean;
+  onCheckUpdate?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -60,6 +62,8 @@ export const Header: React.FC<HeaderProps> = ({
   isDirty,
   theme,
   onToggleTheme,
+  checkingUpdate = false,
+  onCheckUpdate,
 }) => {
   const shortWs = workspacePath.length > 28 ? '...' + workspacePath.slice(-25) : workspacePath;
 
@@ -201,6 +205,18 @@ export const Header: React.FC<HeaderProps> = ({
           <Download className="w-3.5 h-3.5 text-[var(--ty-text-subtle)]" />
           <span className="text-[11px] font-medium">导入</span>
         </button>
+
+        {onCheckUpdate && (
+          <button
+            onClick={onCheckUpdate}
+            disabled={checkingUpdate}
+            className="ty-btn-ghost ty-pressable flex items-center gap-1 px-2 h-7 rounded-md text-xs transition-all disabled:opacity-50"
+            title="检查应用更新（仅安装版可用）"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-[var(--ty-text-subtle)] ${checkingUpdate ? 'animate-spin' : ''}`} />
+            <span className="text-[11px] font-medium">{checkingUpdate ? '检查中' : '检查更新'}</span>
+          </button>
+        )}
 
         <div className="h-3.5 w-px bg-[var(--ty-border)] opacity-60 mx-1" />
 

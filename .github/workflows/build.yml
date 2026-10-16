@@ -1,6 +1,8 @@
 name: Build
 
 # Unsigned packaging for the public repo. No GitHub Release and no signing secrets.
+# --no-sign skips updater signatures so this job can run without TAURI_SIGNING_PRIVATE_KEY.
+# Tag releases that write latest.json live in release.yml.
 # Push covers both names: this repo's default branch is master, and main is included
 # so a rename still starts a build.
 on:
@@ -25,14 +27,16 @@ jobs:
           - platform: 'windows-latest'
             os: 'windows'
             arch: 'x64'
+            # createUpdaterArtifacts is on, but this job stays unsigned and does not publish a Release.
+            args: '--no-sign'
           - platform: 'macos-latest'
             os: 'macos'
             arch: 'universal'
-            args: '--target universal-apple-darwin'
+            args: '--target universal-apple-darwin --no-sign'
           - platform: 'ubuntu-22.04'
             os: 'linux'
             arch: 'x64'
-            args: '--bundles appimage,deb'
+            args: '--bundles appimage,deb --no-sign'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
