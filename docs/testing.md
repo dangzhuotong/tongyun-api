@@ -253,3 +253,7 @@ mod tests {
     }
 }
 ```
+
+当前 Agent 授权、Runner 行为与持久化审计契约见 [Agent 安全与追溯](agent-safety.md)。
+
+本轮执行证据：[2026-10-16 Agent 安全与追溯](testing/runs/2026-10-16-agent-safety.md)。

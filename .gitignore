@@ -36,3 +36,6 @@ http-client.private.env.json
 !.env.example
 .tongyun-trace.json
 src-tauri/tongyun-collections
+
+# Python bridge-client bytecode
+__pycache__/

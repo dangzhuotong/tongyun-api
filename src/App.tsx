@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { GitBranch, FolderTree, Keyboard } from 'lucide-react';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -12,6 +12,7 @@ import { GitStatusModal } from './components/GitStatusModal';
 import { AiInspectorModal } from './components/AiInspectorModal';
 import { CollectionRunnerModal } from './components/CollectionRunnerModal';
 import { ShortcutsModal } from './components/ShortcutsModal';
+import { bridgeFetch } from './services/bridgeClient';
 import { apiClient, GitStatusResult, isTauri } from './services/apiClient';
 import {
   RequestData,
@@ -687,8 +688,12 @@ export const App: React.FC = () => {
     }
   };
 
-  // 监听来自桌面 Rust Bridge (端口 4171) 以及 BroadcastChannel 的 AI 事件
+  const bridgeHandlers = useRef({ push: handleAiPushRequest, send: handleSendRequest });
+  bridgeHandlers.current = { push: handleAiPushRequest, send: handleSendRequest };
+
+  // Only authenticated Rust Bridge events may drive requests.
   useEffect(() => {
+    let disposed=false;
     let unlistenPush: (() => void) | undefined;
     let unlistenSend: (() => void) | undefined;
     let unlistenTelemetry: (() => void) | undefined;
@@ -719,21 +724,21 @@ export const App: React.FC = () => {
     if (isTauri()) {
       import('@tauri-apps/api/event').then(({ listen }) => {
         listen<any>('ai-bridge-push', (event) => {
-          handleAiPushRequest(event.payload);
+          bridgeHandlers.current.push(event.payload);
         }).then(unlisten => {
-          unlistenPush = unlisten;
+          if(disposed) unlisten(); else unlistenPush = unlisten;
         }).catch(err => {
           console.warn('Tauri event listen error (push):', err);
         });
 
         listen<any>('ai-bridge-send', (event) => {
           if (event.payload && (event.payload.url || event.payload.name)) {
-            handleAiPushRequest({ ...event.payload, autoSend: true });
+            bridgeHandlers.current.push({ ...event.payload, autoSend: true });
           } else {
-            handleSendRequest();
+            bridgeHandlers.current.send();
           }
         }).then(unlisten => {
-          unlistenSend = unlisten;
+          if(disposed) unlisten(); else unlistenSend = unlisten;
         }).catch(err => {
           console.warn('Tauri event listen error (send):', err);
         });
@@ -741,7 +746,7 @@ export const App: React.FC = () => {
         listen<any>('ai-bridge-telemetry', (event) => {
           handleTelemetryEvent(event.payload);
         }).then(unlisten => {
-          unlistenTelemetry = unlisten;
+          if(disposed) unlisten(); else unlistenTelemetry = unlisten;
         }).catch(err => {
           console.warn('Tauri event listen error (telemetry):', err);
         });
@@ -750,54 +755,19 @@ export const App: React.FC = () => {
       });
     }
 
-    const channel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('tongyun_ai_bridge') : null;
-    if (channel) {
-      channel.onmessage = (event) => {
-        if (event.data?.type === 'push') {
-          handleAiPushRequest(event.data.payload);
-        } else if (event.data?.type === 'send') {
-          if (event.data.payload?.url) {
-            handleAiPushRequest({ ...event.data.payload, autoSend: true });
-          } else {
-            handleSendRequest();
-          }
-        } else if (event.data?.type === 'telemetry' || event.data?.type === 'thought') {
-          handleTelemetryEvent(event.data.payload);
-        }
-      };
-    }
-
-    const handleWindowMessage = (e: MessageEvent) => {
-      if (e.data?.source === 'tongyun-ai-bridge') {
-        if (e.data.type === 'push') {
-          handleAiPushRequest(e.data.payload);
-        } else if (e.data.type === 'send') {
-          if (e.data.payload?.url) {
-            handleAiPushRequest({ ...e.data.payload, autoSend: true });
-          } else {
-            handleSendRequest();
-          }
-        } else if (e.data.type === 'telemetry' || e.data.type === 'thought') {
-          handleTelemetryEvent(e.data.payload);
-        }
-      }
-    };
-    window.addEventListener('message', handleWindowMessage);
-
     return () => {
+      disposed=true;
       if (unlistenPush) unlistenPush();
       if (unlistenSend) unlistenSend();
       if (unlistenTelemetry) unlistenTelemetry();
-      if (channel) channel.close();
-      window.removeEventListener('message', handleWindowMessage);
     };
   }, []);
 
   // 保持与外部 AI Bridge (4171) 的双向状态同步，使外部 Agent 可随时读取当前 UI 状态
   useEffect(() => {
-    if (!currentRequest) return;
+    if (!currentRequest || !isTauri()) return;
     try {
-      fetch('http://127.0.0.1:4171/api/sync', {
+      bridgeFetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

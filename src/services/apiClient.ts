@@ -7,7 +7,7 @@ import {
   KeyValueItem,
   GitStatusResult
 } from '../types/api';
-import { interpolateText } from '../utils/curl';
+import { substitute } from '../parser/substitute';
 
 export type { GitStatusResult };
 
@@ -318,29 +318,31 @@ export const apiClient = {
     request: RequestData,
     environment: EnvironmentData | null
   ): Promise<ResponsePayload> {
-    // 变量替换
-    const resolvedUrl = interpolateText(request.url || '', environment);
-    const resolvedHeaders: KeyValueItem[] = (request.headers || []).map(h => ({
+    const variables=Object.fromEntries((environment?.variables ?? []).filter(v=>v.enabled).map(v=>[v.key,v.value]));
+    const resolve=(text:string)=>{const value=substitute(text,variables,{resolveDynamic:true});if(value.missing.length||value.unsupported.length)throw new Error('UNRESOLVED_VARIABLE');return value.text;};
+    // Only enabled fields participate in validation.
+    const resolvedUrl = resolve(request.url || '');
+    const resolvedHeaders: KeyValueItem[] = (request.headers || []).filter(h=>h.enabled).map(h => ({
       ...h,
-      key: interpolateText(h.key, environment),
-      value: interpolateText(h.value, environment),
+      key: resolve(h.key),
+      value: resolve(h.value),
     }));
-    const resolvedParams: KeyValueItem[] = (request.params || []).map(p => ({
+    const resolvedParams: KeyValueItem[] = (request.params || []).filter(p=>p.enabled).map(p => ({
       ...p,
-      key: interpolateText(p.key, environment),
-      value: interpolateText(p.value, environment),
+      key: resolve(p.key),
+      value: resolve(p.value),
     }));
     const resolvedBody = {
       ...(request.body || { body_type: 'none', content: '' }),
-      content: interpolateText(request.body?.content || '', environment),
+      content: request.body?.body_type === 'none' ? '' : resolve(request.body?.content || ''),
     };
     const resolvedAuth = {
       ...(request.auth || { auth_type: 'none' }),
-      token: request.auth?.token ? interpolateText(request.auth.token, environment) : undefined,
-      username: request.auth?.username ? interpolateText(request.auth.username, environment) : undefined,
-      password: request.auth?.password ? interpolateText(request.auth.password, environment) : undefined,
-      api_key_name: request.auth?.api_key_name ? interpolateText(request.auth.api_key_name, environment) : undefined,
-      api_key_value: request.auth?.api_key_value ? interpolateText(request.auth.api_key_value, environment) : undefined,
+      token: request.auth?.auth_type === 'bearer' && request.auth?.token ? resolve(request.auth.token) : undefined,
+      username: request.auth?.auth_type === 'basic' && request.auth?.username ? resolve(request.auth.username) : undefined,
+      password: request.auth?.auth_type === 'basic' && request.auth?.password ? resolve(request.auth.password) : undefined,
+      api_key_name: request.auth?.auth_type === 'apikey' && request.auth?.api_key_name ? resolve(request.auth.api_key_name) : undefined,
+      api_key_value: request.auth?.auth_type === 'apikey' && request.auth?.api_key_value ? resolve(request.auth.api_key_value) : undefined,
     };
 
     if (isTauri()) {

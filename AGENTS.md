@@ -84,3 +84,5 @@
 - 发送放在 `src-tauri/src/send.rs`，由异步命令放到阻塞线程上执行。只允许 `http` 和 `https`。跨主机的重定向停在 3xx，不继续把请求头带过去。
 - 界面保持安静：浅底、细分割线、一种强调色。文案用中文。
 - 改完跑 `npm run check`。没跑过的命令不要写进说明。
+
+当前 Agent 授权、Runner 行为与持久化审计契约见 [Agent 安全与追溯](docs/agent-safety.md)。

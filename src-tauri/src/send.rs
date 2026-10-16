@@ -35,6 +35,9 @@ pub struct HttpExchange {
 }
 
 pub fn validate(request: &OutgoingRequest) -> Result<(), String> {
+    if std::iter::once(request.url.as_str()).chain(request.headers.iter().flat_map(|h|[h.name.as_str(),h.value.as_str()])).chain(request.body.as_deref()).any(|v|v.contains("{{")&&v.contains("}}")) {
+        return Err("UNRESOLVED_VARIABLE".into());
+    }
     if request.method.trim().is_empty() {
         return Err("请求方法为空".to_string());
     }
@@ -135,7 +138,7 @@ fn redirect_policy() -> reqwest::redirect::Policy {
     })
 }
 
-fn is_hop_by_hop(name: &str) -> bool {
+pub(crate) fn is_hop_by_hop(name: &str) -> bool {
     matches!(
         name.to_ascii_lowercase().as_str(),
         "content-length"

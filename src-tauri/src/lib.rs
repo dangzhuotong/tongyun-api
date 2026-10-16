@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
+use tauri::Manager;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -121,7 +122,32 @@ fn get_workspace_path(custom_path: Option<String>) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn execute_http_request(payload: RequestExecutePayload) -> Result<ResponsePayload, String> {
+async fn execute_http_request(app: tauri::AppHandle, payload: RequestExecutePayload) -> Result<ResponsePayload, String> {
+    let dir=app.path().app_config_dir().map_err(|_|"AUDIT_UNAVAILABLE")?.join("audit");
+    let operation=audit::Operation::begin(&dir,"api","http.send",&payload.method,"desktop:local","desktop-session").map_err(|_|"AUDIT_UNAVAILABLE")?;
+    let result=execute_http_request_inner(payload).await;
+    operation.finish(if result.is_ok(){"completed"}else{"failed_or_unknown"}).map_err(|_|"AUDIT_COMPLETION_FAILED: inspect started operation; do not retry automatically")?;
+    result
+}
+#[tauri::command]
+fn operation_history(app: tauri::AppHandle) -> Result<Vec<audit::Event>,String> {
+    let dir=app.path().app_config_dir().map_err(|_|"AUDIT_UNAVAILABLE")?.join("audit");
+    audit::read(&dir).map_err(|_|"AUDIT_UNAVAILABLE".into())
+}
+async fn execute_http_request_inner(payload: RequestExecutePayload) -> Result<ResponsePayload, String> {
+    let unresolved=|text:&str| text.contains("{{") && text.contains("}}");
+    if unresolved(&payload.url)
+        || payload.headers.iter().chain(payload.params.iter()).filter(|item|item.enabled).any(|item|unresolved(&item.key)||unresolved(&item.value))
+        || (payload.body.body_type!="none" && unresolved(&payload.body.content)) {
+        return Err("UNRESOLVED_VARIABLE".into());
+    }
+    let auth_fields=match payload.auth.auth_type.as_str(){
+        "bearer"=>vec![payload.auth.token.as_deref()],
+        "basic"=>vec![payload.auth.username.as_deref(),payload.auth.password.as_deref()],
+        "apikey"=>vec![payload.auth.api_key_name.as_deref(),payload.auth.api_key_value.as_deref()],
+        _=>vec![],
+    };
+    if auth_fields.into_iter().flatten().any(unresolved){return Err("UNRESOLVED_VARIABLE".into());}
     let redirect_policy = match payload.redirect_policy.as_deref() {
         Some("manual") => reqwest::redirect::Policy::none(),
         Some("follow") => reqwest::redirect::Policy::limited(10),
@@ -181,7 +207,9 @@ async fn execute_http_request(payload: RequestExecutePayload) -> Result<Response
 
     // 添加请求头
     for header in payload.headers.iter().filter(|h| h.enabled && !h.key.trim().is_empty()) {
-        req_builder = req_builder.header(&header.key, &header.value);
+        if !send::is_hop_by_hop(&header.key) {
+            req_builder = req_builder.header(&header.key, &header.value);
+        }
     }
 
     // 鉴权配置
@@ -200,9 +228,8 @@ async fn execute_http_request(payload: RequestExecutePayload) -> Result<Response
             if let (Some(k), Some(v)) = (payload.auth.api_key_name, payload.auth.api_key_value) {
                 if !k.trim().is_empty() {
                     if payload.auth.api_key_in.as_deref() == Some("query") {
-                        let mut current_url = req_builder.try_clone().and_then(|r| r.build().ok()).map(|r| r.url().clone()).unwrap_or_else(|| reqwest::Url::parse(&payload.url).unwrap());
-                        current_url.query_pairs_mut().append_pair(&k, &v);
-                        req_builder = client.request(reqwest::Method::from_bytes(payload.method.as_bytes()).unwrap(), current_url);
+                        // Add the query through the existing builder so headers are retained.
+                        req_builder = req_builder.query(&[(k,v)]);
                     } else {
                         req_builder = req_builder.header(&k, &v);
                     }
@@ -259,8 +286,7 @@ async fn execute_http_request(payload: RequestExecutePayload) -> Result<Response
     }
 
     let start_time = Instant::now();
-    let res = req_builder.send().await.map_err(|e| format!("请求发送失败: {}", e))?;
-    let duration = start_time.elapsed();
+    let mut res = req_builder.send().await.map_err(|e| format!("请求发送失败: {}", e))?;
 
     let status = res.status().as_u16();
     let status_text = res.status().canonical_reason().unwrap_or("Unknown").to_string();
@@ -281,7 +307,11 @@ async fn execute_http_request(payload: RequestExecutePayload) -> Result<Response
         });
     }
 
-    let body_bytes = res.bytes().await.map_err(|e| format!("读取响应内容失败: {}", e))?;
+    let mut body_bytes=Vec::new();
+    while let Some(chunk)=res.chunk().await.map_err(|_|"RESPONSE_READ_FAILED")? {
+        if body_bytes.len()+chunk.len()>1024*1024 { return Err("RESPONSE_TOO_LARGE".into()); }
+        body_bytes.extend_from_slice(&chunk);
+    }
     let size_bytes = body_bytes.len();
     let body_str = String::from_utf8_lossy(&body_bytes).to_string();
 
@@ -296,7 +326,7 @@ async fn execute_http_request(payload: RequestExecutePayload) -> Result<Response
         status_text,
         headers: resp_headers,
         body: body_str,
-        time_ms: duration.as_millis() as u64,
+        time_ms: start_time.elapsed().as_millis() as u64,
         size_bytes,
         is_json,
     })
@@ -881,6 +911,7 @@ fn open_in_explorer(path: String) -> Result<(), String> {
 mod scan;
 mod send;
 mod bridge_server;
+mod audit;
 
 #[tauri::command]
 fn scan_workspace(root: String) -> Result<scan::ScannedWorkspace, String> {
@@ -894,10 +925,12 @@ fn examples_dir() -> Option<String> {
 }
 
 #[tauri::command]
-async fn send_http(request: send::OutgoingRequest) -> Result<send::HttpExchange, String> {
-    tauri::async_runtime::spawn_blocking(move || send::execute(&request))
-        .await
-        .map_err(|err| format!("发送任务中断：{err}"))?
+async fn send_http(app: tauri::AppHandle, request: send::OutgoingRequest) -> Result<send::HttpExchange, String> {
+    let dir=app.path().app_config_dir().map_err(|_|"AUDIT_UNAVAILABLE")?.join("audit");
+    let operation=audit::Operation::begin(&dir,"api","http.send",&request.method,"desktop:local","desktop-session").map_err(|_|"AUDIT_UNAVAILABLE")?;
+    let result=tauri::async_runtime::spawn_blocking(move || send::execute(&request)).await.map_err(|_|"SEND_INTERRUPTED".to_string()).and_then(|r|r);
+    operation.finish(if result.is_ok(){"completed"}else{"failed_or_unknown"}).map_err(|_|"AUDIT_COMPLETION_FAILED: inspect started operation; do not retry automatically")?;
+    result
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -907,7 +940,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let handle = app.handle().clone();
-            bridge_server::start_bridge_server(handle, 4171);
+            bridge_server::start_bridge_server(handle, 4171)?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -927,7 +960,9 @@ pub fn run() {
             open_in_explorer,
             scan_workspace,
             examples_dir,
-            send_http
+            send_http,
+            bridge_server::bridge_config,
+            operation_history
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -1093,5 +1128,37 @@ mod tests {
         assert_eq!(loaded.headers[0].value, "val");
         assert_eq!(loaded.body.body_type, "json");
         assert!(loaded.body.content.contains("hello"));
+    }
+}
+
+#[cfg(test)]
+mod agent_execution_regressions {
+    use super::*;
+    use std::{io::{Read,Write},net::TcpListener};
+    fn payload(url:&str)->RequestExecutePayload {
+        serde_json::from_value(serde_json::json!({"method":"DELETE","url":url,"headers":[{"key":"X-Fixture","value":"fixture-header","enabled":true}],"params":[],"body":{"body_type":"json","content":"{\"fixture\":true}"},"auth":{"auth_type":"apikey","api_key_name":"fixture_key","api_key_value":"fixture-value","api_key_in":"query"},"timeout_ms":3000})).unwrap()
+    }
+    fn fixture(body:Vec<u8>)->(String,std::thread::JoinHandle<String>){
+        let listener=TcpListener::bind("127.0.0.1:0").unwrap();let addr=listener.local_addr().unwrap();
+        let thread=std::thread::spawn(move||{
+            let (mut socket,_)=listener.accept().unwrap();socket.set_read_timeout(Some(std::time::Duration::from_secs(3))).unwrap();
+            let mut bytes=Vec::new();let header_end=loop{let mut chunk=[0;4096];let n=socket.read(&mut chunk).unwrap();assert!(n>0);bytes.extend_from_slice(&chunk[..n]);if let Some(end)=bytes.windows(4).position(|w|w==b"\r\n\r\n"){break end;}};
+            let head=String::from_utf8_lossy(&bytes[..header_end]).to_string();
+            let length=head.lines().find_map(|line|line.to_ascii_lowercase().strip_prefix("content-length:").and_then(|s|s.trim().parse::<usize>().ok())).unwrap_or(0);
+            while bytes.len()<header_end+4+length{let mut chunk=[0;4096];let n=socket.read(&mut chunk).unwrap();assert!(n>0);bytes.extend_from_slice(&chunk[..n]);}
+            let response=format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",body.len());
+            let _=socket.write_all(response.as_bytes());let _=socket.write_all(&body);
+            String::from_utf8_lossy(&bytes).into_owned()
+        });(format!("http://{addr}/fixture"),thread)
+    }
+    #[tokio::test] async fn actual_desktop_transport_preserves_delete_body_and_headers_with_query_auth(){
+        let (url,server)=fixture(b"{}".to_vec());let result=execute_http_request_inner(payload(&url)).await.unwrap();assert_eq!(result.status,200);
+        let request=server.join().unwrap();assert!(request.starts_with("DELETE /fixture?fixture_key=fixture-value HTTP/1.1"));assert!(request.to_lowercase().contains("x-fixture: fixture-header"));assert!(request.ends_with("{\"fixture\":true}"));
+    }
+    #[tokio::test] async fn actual_desktop_transport_stops_oversized_response(){
+        let (url,server)=fixture(vec![b'x';1024*1024+1]);assert_eq!(execute_http_request_inner(payload(&url)).await.unwrap_err(),"RESPONSE_TOO_LARGE");server.join().unwrap();
+    }
+    #[tokio::test] async fn desktop_backend_refuses_unresolved_variables_even_without_frontend(){
+        let mut request=payload("http://127.0.0.1:9/fixture");request.headers[0].value="{{missing_fixture}}".into();assert_eq!(execute_http_request_inner(request).await.unwrap_err(),"UNRESOLVED_VARIABLE");
     }
 }

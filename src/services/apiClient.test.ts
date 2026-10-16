@@ -269,6 +269,12 @@ describe("apiClient", () => {
       expect(calledInit.body).toBe("a=1&b=2");
     });
 
+    it("rejects missing variables before invoking either transport", async () => {
+      const fetch=vi.fn();vi.stubGlobal("fetch",fetch);
+      await expect(apiClient.executeHttpRequest(baseRequest,null)).rejects.toThrow("UNRESOLVED_VARIABLE");
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
     it("handles Bearer authentication", async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         status: 200,
@@ -280,6 +286,7 @@ describe("apiClient", () => {
 
       const authReq: RequestData = {
         ...baseRequest,
+        url: "https://httpbin.org/get",
         auth: { auth_type: "bearer", token: "my-secret-token" },
       };
 
@@ -299,6 +306,7 @@ describe("apiClient", () => {
 
       const authReq: RequestData = {
         ...baseRequest,
+        url: "https://httpbin.org/get",
         auth: { auth_type: "basic", username: "user", password: "pwd" },
       };
 
@@ -318,6 +326,7 @@ describe("apiClient", () => {
 
       const headerKeyReq: RequestData = {
         ...baseRequest,
+        url: "https://httpbin.org/get",
         auth: {
           auth_type: "apikey",
           api_key_name: "X-API-KEY",
@@ -332,6 +341,7 @@ describe("apiClient", () => {
 
       const queryKeyReq: RequestData = {
         ...baseRequest,
+        url: "https://httpbin.org/get",
         auth: {
           auth_type: "apikey",
           api_key_name: "token",
@@ -348,7 +358,7 @@ describe("apiClient", () => {
     it("catches fetch network failure and returns formatted error payload", async () => {
       vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Connection refused")));
 
-      const resp = await apiClient.executeHttpRequest(baseRequest, null);
+      const resp = await apiClient.executeHttpRequest({...baseRequest,url:"https://httpbin.org/get"}, null);
       expect(resp.status).toBe(0);
       expect(resp.status_text).toBe("Network Error");
       expect(resp.is_json).toBe(false);

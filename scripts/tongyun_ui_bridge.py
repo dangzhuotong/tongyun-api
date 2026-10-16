@@ -23,11 +23,27 @@ if hasattr(sys.stderr, 'reconfigure'):
 BRIDGE_PORT = 4171
 BRIDGE_BASE_URL = f"http://127.0.0.1:{BRIDGE_PORT}"
 
+def authenticated_request(url, data=None, headers=None, method=None):
+    # Same OS application config directory as Tauri app_config_dir.
+    import pathlib
+    if sys.platform == 'darwin':
+        root = pathlib.Path.home() / 'Library' / 'Application Support'
+    elif os.name == 'nt':
+        root = pathlib.Path(os.environ['APPDATA'])
+    else:
+        root = pathlib.Path(os.environ.get('XDG_CONFIG_HOME', str(pathlib.Path.home() / '.config')))
+    session = json.loads((root / 'com.tongyun.api' / 'bridge-session.json').read_text())
+    if session.get('port') != BRIDGE_PORT:
+        raise ValueError('Bridge session port mismatch')
+    headers = dict(headers or {})
+    headers['Authorization'] = 'Bearer ' + session['token']
+    return urllib.request.Request(url, data=data, headers=headers, method=method)
+
 def check_status():
     """检查桌面客户端 Bridge 状态"""
     url = f"{BRIDGE_BASE_URL}/api/status"
     try:
-        req = urllib.request.Request(url, method="GET")
+        req = authenticated_request(url, method="GET")
         with urllib.request.urlopen(req, timeout=1.5) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             print(f"✅ [Tongyun AI Bridge] 客户端在线 (端口 {BRIDGE_PORT}): {data.get('message', '就绪')}")
@@ -36,11 +52,11 @@ def check_status():
         print(f"⚠️ [Tongyun AI Bridge] 客户端未在线 (端口 {BRIDGE_PORT})。请确认已打开橦云桌面应用 (`npm run tauri dev`)。")
         return False
 
-def get_state():
+def get_state(endpoint="/api/state"):
     """获取当前客户端 UI 的激活接口、最新响应及用例状态"""
-    url = f"{BRIDGE_BASE_URL}/api/state"
+    url = f"{BRIDGE_BASE_URL}{endpoint}"
     try:
-        req = urllib.request.Request(url, method="GET")
+        req = authenticated_request(url, method="GET")
         with urllib.request.urlopen(req, timeout=2.0) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             print(json.dumps(data, ensure_ascii=False, indent=2))
@@ -53,7 +69,7 @@ def push_request(payload):
     """推送单个接口请求及用例数据到客户端 UI"""
     url = f"{BRIDGE_BASE_URL}/api/push"
     data_bytes = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    req = urllib.request.Request(
+    req = authenticated_request(
         url,
         data=data_bytes,
         headers={"Content-Type": "application/json; charset=utf-8"},
@@ -76,7 +92,7 @@ def trigger_send(payload=None):
     """触发客户端 UI 执行发送当前接口"""
     url = f"{BRIDGE_BASE_URL}/api/send"
     data_bytes = json.dumps(payload or {}, ensure_ascii=False).encode("utf-8")
-    req = urllib.request.Request(
+    req = authenticated_request(
         url,
         data=data_bytes,
         headers={"Content-Type": "application/json; charset=utf-8"},
@@ -94,7 +110,7 @@ def trigger_send(payload=None):
 def trigger_run_cases():
     """触发客户端 UI 执行用例集批量测试"""
     url = f"{BRIDGE_BASE_URL}/api/run-cases"
-    req = urllib.request.Request(
+    req = authenticated_request(
         url,
         data=b"{}",
         headers={"Content-Type": "application/json; charset=utf-8"},
@@ -113,7 +129,7 @@ def push_telemetry(payload):
     """向桌面 HUD 投屏 Agent 的思考、假设与任务态势"""
     url = f"{BRIDGE_BASE_URL}/api/telemetry"
     data_bytes = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    req = urllib.request.Request(
+    req = authenticated_request(
         url,
         data=data_bytes,
         headers={"Content-Type": "application/json; charset=utf-8"},
@@ -141,7 +157,7 @@ def get_feedback():
     """获取人类在桌面 UI 上给出的裁决、批注或下一步指令"""
     url = f"{BRIDGE_BASE_URL}/api/feedback"
     try:
-        req = urllib.request.Request(url, method="GET")
+        req = authenticated_request(url, method="GET")
         with urllib.request.urlopen(req, timeout=2.0) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             feedback = data.get("feedback")
@@ -176,6 +192,8 @@ def main():
 
     # state
     subparsers.add_parser("state", help="获取当前 UI 的激活接口、响应状态及用例数据")
+
+    subparsers.add_parser("operations", help="读取持久化操作审计（元数据，不含请求正文）")
 
     # send
     subparsers.add_parser("send", help="触发当前激活接口执行发送")
@@ -227,6 +245,10 @@ def main():
 
     if args.command == "status":
         check_status()
+        return
+
+    if args.command == "operations":
+        get_state("/api/operations")
         return
 
     if args.command == "state":

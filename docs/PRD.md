@@ -60,3 +60,5 @@
 ## 怎样算做完
 
 [docs/tasks/001-mvp.md](tasks/001-mvp.md) 里的验收项全部满足，并且 `npm test`、`npm run build`、`cargo check`、`cargo test` 在本机通过。
+
+当前 Agent 授权、Runner 行为与持久化审计契约见 [Agent 安全与追溯](agent-safety.md)。

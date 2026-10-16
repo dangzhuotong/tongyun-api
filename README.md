@@ -189,3 +189,5 @@ expect(extracted.extractedOrderId).toBe("ord_9988");
 - [AGENTS.md](AGENTS.md)：给 AI Agent 与开发者的代码规范、文件契约与提交守则
 - [docs/PRD.md](docs/PRD.md)：产品需求与设计原则
 - [docs/tasks/001-mvp.md](docs/tasks/001-mvp.md)：MVP 验收项清单
+
+当前 Agent 授权、Runner 行为与持久化审计契约见 [Agent 安全与追溯](docs/agent-safety.md)。
