@@ -129,6 +129,52 @@ describe("substitute", () => {
     const result = substitute(input, variables, { maskKeys });
     expect(result.text).toBe("Bearer se••••ue for admin");
   });
+
+  it("returns empty text for empty input and leaves plain text untouched", () => {
+    expect(substitute("", { host: "x" })).toEqual({
+      text: "",
+      missing: [],
+      unsupported: [],
+    });
+    expect(substitute("no variables here", {})).toEqual({
+      text: "no variables here",
+      missing: [],
+      unsupported: [],
+    });
+  });
+
+  it("treats a variable defined as an empty string as present", () => {
+    const result = substitute("value=[{{empty}}]", { empty: "" });
+    expect(result.text).toBe("value=[]");
+    expect(result.missing).toEqual([]);
+  });
+
+  it("supports variable names containing dots and dashes", () => {
+    const result = substitute("{{auth.token}}|{{server-host}}", {
+      "auth.token": "abc",
+      "server-host": "httpbin.org",
+    });
+    expect(result.text).toBe("abc|httpbin.org");
+    expect(result.missing).toEqual([]);
+  });
+
+  it("deduplicates repeated missing variables", () => {
+    const result = substitute("{{gone}}/{{gone}}?again={{gone}}", {});
+    expect(result.missing).toEqual(["gone"]);
+  });
+
+  it("deduplicates repeated unsupported dynamic variables and tolerates whitespace", () => {
+    const result = substitute("{{ $uuid }}-{{$uuid}}", {});
+    expect(result.text).toBe("{{ $uuid }}-{{$uuid}}");
+    expect(result.unsupported).toEqual(["$uuid"]);
+  });
+
+  it("leaves malformed or incomplete braces untouched", () => {
+    const result = substitute("{{ }} { {a} } {{a", {});
+    expect(result.text).toBe("{{ }} { {a} } {{a");
+    expect(result.missing).toEqual([]);
+    expect(result.unsupported).toEqual([]);
+  });
 });
 
 describe("resolveRequest", () => {
@@ -183,5 +229,47 @@ describe("resolveRequest", () => {
 
     expect(resolved.missing).toEqual(["missingBody", "missingHeader", "path"]);
     expect(resolved.unsupported).toEqual(["$uuid"]);
+  });
+
+  it("handles a request with no headers and an empty body", () => {
+    const req: ParsedRequest = {
+      name: "最小请求",
+      method: "GET",
+      url: "https://httpbin.org/get",
+      headers: [],
+      body: "",
+      line: 1,
+    };
+
+    const resolved = resolveRequest(req, {});
+    expect(resolved).toEqual({
+      method: "GET",
+      url: "https://httpbin.org/get",
+      headers: [],
+      body: "",
+      missing: [],
+      unsupported: [],
+    });
+  });
+
+  it("resolves dynamic variables and masks secrets across url and body", () => {
+    const req: ParsedRequest = {
+      name: "动态请求",
+      method: "POST",
+      url: "{{host}}/post?id={{$uuid}}",
+      headers: [],
+      body: '{"token":"{{token}}"}',
+      line: 1,
+    };
+
+    const resolved = resolveRequest(req, { host: "https://httpbin.org", token: "abcdefgh" }, {
+      maskKeys: new Set(["token"]),
+      resolveDynamic: true,
+    });
+
+    expect(resolved.url).toMatch(/^https:\/\/httpbin\.org\/post\?id=[a-f0-9-]{36}$/);
+    expect(resolved.body).toBe('{"token":"ab••••gh"}');
+    expect(resolved.missing).toEqual([]);
+    expect(resolved.unsupported).toEqual([]);
   });
 });
