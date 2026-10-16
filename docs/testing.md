@@ -18,7 +18,7 @@
            ▼                                                       ▼
 ┌─────────────────────────────────┐     ┌─────────────────────────────────┐
 │     前端解析与断言层 (Vitest)    │     │       后端宿主与发送层 (Cargo)   │
-│   src/parser/ & src/utils/      │     │   src-tauri/src/                │
+│   src/parser/ & src/utils/ 等   │     │   src-tauri/src/                │
 │                                 │     │                                 │
 │  - .http / .rest 文本解析       │     │  - 工作区递归扫描与目录过滤      │
 │  - 公共与私有环境变量层级合并    │     │  - http / https 协议白名单校验  │
@@ -29,13 +29,13 @@
 ```
 
 ### 1.1 前端层（Vitest + TypeScript）
-* **目录位置**：`src/parser/` 与 `src/utils/`
+* **目录位置**：`src/parser/`、`src/utils/`、`src/model/`、`src/services/`，以及 `src/` 根目录下的 `samples.test.ts`、`updater.test.ts`。
 * **运行机制**：基于纯内存的 TypeScript/JavaScript 运行环境，不依赖浏览器 DOM，无外部网络强依赖，毫秒级快速反馈。
 * **职责范畴**：
   * **请求文本解析**：解析 `###` 标题分隔、请求行解析、HTTP 版本清洗、默认 GET 处理、注释行过滤、`< {% ... %}` 与 `> {% ... %}` 脚本剥离、`# @name` 与 `// @name` 优先级处理、缩进 Query 参数拼装。
   * **环境配置合并**：公共环境文件 `http-client.env.json` 与本机私有环境文件 `http-client.private.env.json` 按文件树向上追溯合并，私有配置优先；点号访问嵌套字段（如 `{{auth.token}}`）；损坏 JSON 容错与提示。
   * **模板变量代入**：请求 URL、请求头、请求体中 `{{变量名}}` 的提取与替换；收集 `missing` 缺失变量并向 UI 提供告警列表以阻止误发送；标记不受支持或动态系统变量。
-  * **客户端代码生成与转换**：8 种主流语言与框架代码片段生成（cURL、Fetch、Axios、Requests、HTTPX、Go、Rust）；双向 cURL 序列化与反序列化解析。
+  * **客户端代码生成与转换**：8 种主流语言与框架代码片段生成（cURL、JavaScript Fetch/Axios、TypeScript Fetch、Python Requests/HTTPX、Go、Rust reqwest）；双向 cURL 序列化与反序列化解析。
   * **断言与测试判定引擎**：深层 JSON 属性获取、各种操作符断言判定、响应内容变量提取及工业级用例生成。
   * **示例集回归**：以 `examples/` 真实用例文件为基准，确保各接口在 `httpbin` 及 `local` 环境下替换无误。
 
@@ -69,9 +69,10 @@
 ## 3. 当前覆盖的模块清单
 
 ### 3.1 前端模块清单
-* `src/parser/httpFile.ts` (`src/parser/parser.test.ts`)
+* `src/parser/httpFile.ts` (`src/parser/httpFile.test.ts`)
   * `parseHttpFile`：请求切分、请求行格式化、注释行过滤、前置/响应脚本过滤、`# @name` / `// @name` 自定义命名优先级、URL 缩进 Query 语法合并、外部文件引用警告、格式容错。
-  * `examples/` 示例集解析验证（`basics.http`、`methods.http`、`headers-auth.http`、`json-body.http`、`variables.http`）。
+* `src/parser/parser.test.ts`
+  * `examples/` 示例集解析验证（`basics.http`、`methods.http`、`headers-auth.http`、`json-body.http`、`variables.http`）与多层环境变量替换回归。
 * `src/parser/env.ts` (`src/parser/env.test.ts`)
   * `mergeEnvironmentLayers`：公共环境与私有环境合并、路径由近及远层级覆盖、嵌套 JSON 对象展开为点号路径、非法 JSON 容错。
   * `flattenVariables`：嵌套对象扁平化与基本类型保留。
@@ -83,7 +84,7 @@
   * `exportToCurl`：将内部请求模型转为标准可执行 cURL 文本。
   * `parseCurl`：将单条 cURL 命令行反解为内部请求模型。
 * `src/utils/codeGenerators.ts` (`src/utils/codeGenerators.test.ts`)
-  * 8 种主流语言与框架代码生成器输出校验（cURL、JavaScript Fetch/Axios、TypeScript、Python requests/httpx、Go、Rust reqwest）。
+  * 8 种主流语言与框架代码生成器输出校验（cURL、JavaScript Fetch/Axios、TypeScript Fetch、Python requests/httpx、Go、Rust reqwest）。
 * `src/utils/importers.ts` (`src/utils/importers.test.ts`)
   * Postman Collection v2.1 格式导入解析。
   * OpenAPI 3.0 / Swagger 规范解析导入。
@@ -93,6 +94,20 @@
   * `evaluateAssertions`：状态码、响应耗时、JSON 路径与响应头断言引擎。
   * `extractVariables`：从响应 JSON 或 Header 提取字段并注入环境变量。
   * `generateSmartAssertions` & `generateAiTestCaseSuite`：智能测试用例集生成。
+* `src/utils/diff.ts` (`src/utils/diff.test.ts`)
+  * `computeLineDiff` / `normalizeDiffText`：响应文本行级差异计算与差异文本归一化。
+* `src/utils/jsonTokenizer.ts` (`src/utils/jsonTokenizer.test.ts`)
+  * `tokenizeJson`：JSON 文本词法切分，供编辑器高亮与折叠使用。
+* `src/model/workspace.ts` (`src/model/workspace.test.ts`)
+  * `assembleWorkspace`、`buildTree`、`prettyBody`：工作区模型组装、文件树构建与请求体格式化，并结合 `resolveRequest` 验证变量替换。
+* `src/services/apiClient.ts` (`src/services/apiClient.test.ts`)
+  * `apiClient`：Tauri 命令调用客户端及浏览器环境回退。
+  * `isTauri`：运行宿主判定。
+* `src/samples.ts` (`src/samples.test.ts`)
+  * `builtinWorkspace`：内置示例工作区构建，并结合 `resolveRequest` 验证变量替换。
+* `src/updater.ts` (`src/updater.test.ts`)
+  * `resolveDisplayedAppVersion`：应用版本号展示解析。
+  * `updateCheckNotice`：更新检查提示文案生成。
 
 ### 3.2 后端模块清单
 * `src-tauri/src/scan.rs`
