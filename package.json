@@ -1,7 +1,7 @@
 {
   "name": "tongyun-api",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "橦云接口：本地优先的纯文本 API 调试桌面应用",
   "type": "module",
   "scripts": {

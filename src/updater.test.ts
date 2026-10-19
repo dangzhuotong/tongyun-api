@@ -34,7 +34,7 @@ describe("updateCheckNotice", () => {
 });
 
 describe("release versions stay aligned", () => {
-  it("keeps package.json, tauri.conf.json, and Cargo.toml on 0.2.0 with the updater pubkey", () => {
+  it("keeps package.json, tauri.conf.json, and Cargo.toml on 0.2.1 with the updater pubkey", () => {
     const pkg = JSON.parse(pkgRaw) as { version: string };
     const tauri = JSON.parse(tauriRaw) as {
       version: string;
@@ -42,7 +42,7 @@ describe("release versions stay aligned", () => {
       plugins: { updater: { pubkey: string; endpoints: string[] } };
     };
     const cargoVersion = cargoRaw.match(/^version = "([^"]+)"/m)?.[1];
-    expect(pkg.version).toBe("0.2.0");
+    expect(pkg.version).toBe("0.2.1");
     expect(tauri.version).toBe(pkg.version);
     expect(cargoVersion).toBe(pkg.version);
     expect(tauri.bundle.createUpdaterArtifacts).toBe(true);
