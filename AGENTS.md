@@ -20,6 +20,7 @@
 | 前端构建 | `npm run build` | 产出 `dist/` |
 | Rust 检查 | `npm run check:rust` | `cargo check` 无错误 |
 | Rust 测试 | `npm run test:rust` | `cargo test` 全部通过 |
+| 依赖审计 | `npm run audit` | 依赖安全告警清零（found 0 vulnerabilities） |
 | 一起检查 | `npm run check` | 类型、解析器、Rust 检查和测试都通过 |
 | 浏览器预览 | `npm run dev` | Vite 在 `http://localhost:1420` |
 | 桌面开发 | `npm run tauri dev` | 打开「橦云接口」窗口，发送走 Rust |

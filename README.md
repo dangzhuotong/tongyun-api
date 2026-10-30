@@ -125,6 +125,7 @@ npm run dev
 | **全量前端单测** | `npm test` | 调用 `vitest run` 执行所有前端单测 |
 | **单文件针对性测试** | `npm test -- src/parser/parser.test.ts` | 针对单个测试套件进行快速调试与验证 |
 | **后端 Rust 单测** | `npm run test:rust` | 执行后端目录扫描、安全策略与请求调度测试 |
+| **依赖安全审计** | `npm run audit` | 针对官方 registry 扫描依赖漏洞与安全告警 |
 | **全量工程门禁** | `npm run check` | 依次执行类型检查、前端单测、Rust 语法检查与 Rust 单测 |
 
 ### 2. 前端测试套件覆盖
